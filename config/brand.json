@@ -1,0 +1,32 @@
+{
+  "project_name": "Al-Manara AI Dev Hub",
+  "brand_name": "المنارة كريبتو (Al-Manara Crypto)",
+  "tagline": "المحطة الطرفية الذكية الأولى للمطورين وتقنيات الكريبتو والذكاء الاصطناعي",
+  "community": {
+    "website": "https://almanaracrypto.com",
+    "telegram": "https://t.me/your_channel",
+    "twitter": "https://x.com/your_handle"
+  },
+  "donation_wallets": {
+    "USDT_TRC20": {
+      "network": "Tron (TRC-20)",
+      "address": "ضع_عنوان_محفظة_TRC20_هنا",
+      "note": "الأسرع والأقل عمولة لـ USDT"
+    },
+    "EVM_USDT_ETH_BNB": {
+      "network": "Ethereum / BSC / Arbitrum (BEP-20 / ERC-20)",
+      "address": "ضع_عنوان_محفظة_EVM_هنا_0x...",
+      "note": "تدعم شبكات BNB Chain و Ethereum و Arbitrum"
+    },
+    "SOLANA": {
+      "network": "Solana (SOL)",
+      "address": "ضع_عنوان_محفظة_سولانا_هنا",
+      "note": "تحويلات فائقة السرعة وعمولة شبه معدومة"
+    },
+    "BITCOIN": {
+      "network": "Bitcoin (BTC)",
+      "address": "ضع_عنوان_محفظة_البيتكوين_هنا",
+      "note": "شبكة البيتكوين الرئيسية"
+    }
+  }
+}

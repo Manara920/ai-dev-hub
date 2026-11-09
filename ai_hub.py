@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 ==============================================================================
- 🛠️ AI Dev Hub Pro - Open Source Unified AI & Git Workspace
- Clean, Generic & Secure Version for Any User
+ 🏮 Al-Manara AI Dev Hub Pro - المنارة كريبتو
+ محطة المطور والذكاء الاصطناعي الموحدة (Local & Cloud & GitHub)
 ==============================================================================
 """
 
@@ -13,9 +13,10 @@ import json
 import subprocess
 from pathlib import Path
 
-# Base Paths (Local to where the user clones the project)
+# إعداد المسارات
 ROOT_DIR = Path(__file__).resolve().parent
 CONFIG_FILE = ROOT_DIR / "config/models.json"
+BRAND_FILE = ROOT_DIR / "config/brand.json"
 ENV_FILE = ROOT_DIR / "config/.env"
 
 # Rich Library support
@@ -31,6 +32,18 @@ except ImportError:
     USE_RICH = False
     console = None
 
+def load_json(file_path):
+    if file_path.exists():
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+CONFIG = load_json(CONFIG_FILE)
+BRAND = load_json(BRAND_FILE)
+
 def load_env():
     env_vars = {}
     if ENV_FILE.exists():
@@ -44,17 +57,6 @@ def load_env():
 
 ENV_VARS = load_env()
 
-def get_config():
-    if CONFIG_FILE.exists():
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
-
-CONFIG = get_config()
-
 def get_provider_key(provider_key_name):
     return os.getenv(provider_key_name) or ENV_VARS.get(provider_key_name)
 
@@ -64,13 +66,11 @@ def get_local_models_dir():
         p = Path(custom_path).expanduser()
         if p.exists() and p.is_dir():
             return p
-    # Standard fallback paths
     for fallback in [Path("/storage/emulated/0/LLM's"), Path.home() / "models", Path.home() / "LLMs"]:
         if fallback.exists() and fallback.is_dir():
             return fallback
     return Path.home() / "models"
 
-# --- User & GitHub Helpers ---
 def get_current_git_user():
     try:
         res = subprocess.run(["gh", "api", "user", "--jq", ".login"], capture_output=True, text=True, timeout=3)
@@ -86,13 +86,53 @@ def get_current_git_user():
         pass
     return "User"
 
-# --- Help & Documentation [H] ---
+# --- شاشة التبرعات ودعم المنارة كريبتو [D] ---
+def show_donation_screen():
+    os.system("clear")
+    wallets = BRAND.get("donation_wallets", {})
+    comm = BRAND.get("community", {})
+
+    if USE_RICH:
+        title = Text("🪙 دعم وتطوير المشروع - المنارة كريبتو", style="bold gold1")
+        sub = Text("إذا نال هذا المشروع استحسانك، يمكنك المساهمة في استمراره وتطويره عبر المحافظ الرقمية:", style="dim white")
+        console.print(Panel(Text.assemble(title, "\n", sub), border_style="gold1", padding=(1, 2)))
+
+        tbl = Table(title="💎 المحافظ الرقمية المعتمدة للدعم", border_style="yellow", header_style="bold yellow")
+        tbl.add_column("العملة والشبكة", style="cyan", width=26)
+        tbl.add_column("عنوان المحفظة (Address)", style="bold white")
+        tbl.add_column("ملاحظات", style="dim green", width=28)
+
+        for k, w in wallets.items():
+            tbl.add_row(w.get("network", k), w.get("address", "-"), w.get("note", ""))
+        console.print(tbl)
+
+        c_table = Table(title="🌐 مجتمع وقنوات المنارة كريبتو", border_style="cyan", header_style="bold cyan")
+        c_table.add_column("المنصة", style="yellow", width=16)
+        c_table.add_column("الرابط المباشر", style="bold blue")
+        c_table.add_row("الموقع الرسمي", comm.get("website", "-"))
+        c_table.add_row("قناة تيليجرام", comm.get("telegram", "-"))
+        c_table.add_row("منصة X (تويتر)", comm.get("twitter", "-"))
+        console.print(c_table)
+
+        console.print("[dim]• يمكنك تعديل هذه العناوين لاحقاً في أي وقت من ملف: [bold cyan]config/brand.json[/bold cyan][/dim]")
+    else:
+        print("\n=== 🪙 دعم وتطوير المشروع - المنارة كريبتو ===")
+        print("المحافظ الرقمية المعتمدة:")
+        for k, w in wallets.items():
+            print(f"- {w.get('network')}: {w.get('address')}")
+        print("\nروابط المجتمع:")
+        for k, v in comm.items():
+            print(f"- {k}: {v}")
+    
+    input("\nاضغط Enter للعودة إلى القائمة الرئيسية...")
+
+# --- دليل استخدام وتوجيهات ربط الـ APIs [H] ---
 def show_api_guide():
     os.system("clear")
     guide_md = """
 # 📖 دليل إعداد وربط المفاتيح (Setup Guide)
 
-أهلاً بك في **AI Dev Hub**! صُمم هذا المشروع ليعمل فورياً على أي جهاز دون ربط مسبق بأي حساب.
+أهلاً بك في **Al-Manara AI Dev Hub**! 
 
 ---
 
@@ -126,7 +166,7 @@ def show_api_guide():
 
 ### 💡 إدارة المفاتيح محلياً:
 - استخدم الخيار **`[K]`** داخل السكربت لإدخال مفاتيحك.
-- تُحفظ مفاتيحك في ملف محلي خاص `config/.env` محمي بموجب `.gitignore` ولن يتم رفعه نهائياً لأي مستودع عام.
+- تُحفظ مفاتيحك في ملف محلي خاص `config/.env` محمي بموجب `.gitignore`.
 """
     if USE_RICH:
         console.print(Markdown(guide_md))
@@ -134,11 +174,11 @@ def show_api_guide():
         print(guide_md)
     input("\nاضغط Enter للعودة للقائمة الرئيسية...")
 
-# --- Key Management [K] ---
+# --- إدارة المفاتيح [K] ---
 def add_api_key_prompt():
     os.system("clear")
     if USE_RICH:
-        console.print(Panel(Text("🔑 إدارة مفاتيح الـ API الخاصة بك", style="bold yellow"), border_style="yellow"))
+        console.print(Panel(Text("🔑 إدارة وتحديث مفاتيح الـ API", style="bold yellow"), border_style="yellow"))
     
     providers = CONFIG.get("providers", {})
     p_keys = list(providers.keys())
@@ -281,12 +321,11 @@ def run_cloud_model(chosen):
             add_api_key_prompt()
         return
 
-    # Check if Groq CLI exists locally
+    import shutil
     if p_key == "groq" and shutil.which("groq"):
         subprocess.run(["groq", "-m", chosen["model_name"]])
         return
 
-    # Standard OpenAI API client
     print(f"\n[*] جاري فتح الاتصال بـ {chosen['label']} ...")
     try:
         from openai import OpenAI
@@ -298,13 +337,19 @@ def run_cloud_model(chosen):
     base_url = p_data.get("base_url")
     client = OpenAI(base_url=base_url, api_key=api_key)
 
+    # Branded Persona
+    system_prompt = (
+        "أنت مساعد برمجي ومهندس ذكي مدعوم من المنارة كريبتو (Al-Manara Crypto). "
+        "قدم حلولاً متقدمة وأكواداً ممتازة ودقيقة مع خبرة بالبرمجة وتقنيات البلوكشين والتحليل التقني."
+    )
+
     print("=" * 60)
     print(f"  ⚡ تم الاتصال بالنموذج: {chosen['label']}")
     print(f"  • المزود: {chosen['provider_name']}")
     print("  • اكتب رسالتك واضغط Enter. للخروج اكتب /exit أو q")
     print("=" * 60)
 
-    history = [{"role": "system", "content": "أنت مساعد برمجي ومهندس محترف، تجيب بوضوح وتكتب أكواداً ممتازة بالعربية والإنجليزية."}]
+    history = [{"role": "system", "content": system_prompt}]
     while True:
         try:
             user_msg = input("\nأنت ❯ ").strip()
@@ -339,9 +384,13 @@ def main():
         cloud_models = get_all_cloud_models()
 
         if USE_RICH:
-            h_text = Text("🛠️ AI Dev Hub Pro - محطة المطور والذكاء الاصطناعي الشاملة", style="bold cyan")
-            sub_text = Text("نماذج محلية + DeepSeek & Kimi & Groq + إدارة ومتابعة GitHub", style="dim white")
-            console.print(Panel(Text.assemble(h_text, "\n", sub_text), border_style="cyan"))
+            # شعار وبانر المنارة كريبتو
+            b_name = BRAND.get("brand_name", "المنارة كريبتو")
+            b_tag = BRAND.get("tagline", "المحطة الطرفية الذكية")
+            
+            h_text = Text(f"🏮 {b_name} - AI Dev Hub Pro", style="bold gold1")
+            sub_text = Text(f"{b_tag} | Local & Cloud & GitHub", style="dim white")
+            console.print(Panel(Text.assemble(h_text, "\n", sub_text), border_style="gold1"))
 
             # جدول النماذج المحلية
             tbl_local = Table(title="💻 النماذج المحلية في جهازك (Offline)", border_style="green", header_style="bold green")
@@ -369,20 +418,21 @@ def main():
                 tbl_cloud.add_row(str(idx), c["label"], c["provider_name"], c["tier"])
             console.print(tbl_cloud)
 
-            # شريط التحكم
+            # شريط التحكم السفلي متضمناً زر الدعم [D]
             console.print(Panel(
-                "[bold magenta][G][/bold magenta] 🐙 إدارة ومتابعة GitHub  |  "
-                "[bold yellow][K][/bold yellow] 🔑 إدارة وتحديث المفاتيح  |  "
-                "[bold cyan][H][/bold cyan] 📖 دليل ربط الـ APIs  |  "
+                "[bold magenta][G][/bold magenta] 🐙 إدارة GitHub  |  "
+                "[bold yellow][K][/bold yellow] 🔑 إدارة المفاتيح  |  "
+                "[bold cyan][H][/bold cyan] 📖 دليل الـ APIs  |  "
+                "[bold gold1][D][/bold gold1] 🪙 دعم وتبرعات  |  "
                 "[bold red][Q][/bold red] خروج",
-                border_style="dim white"
+                border_style="gold1"
             ))
             choice = console.input("[bold yellow]اختر رقم النموذج أو أمر التحكم ❯ [/bold yellow]").strip()
         else:
             print("==================================================")
-            print("           AI Dev Hub Pro (Terminal)")
+            print("      Al-Manara Crypto - AI Dev Hub Pro")
             print("==================================================")
-            choice = input("اختر رقم النموذج أو (G=GitHub / K=مفاتيح / H=دليل / Q=خروج) ❯ ").strip()
+            choice = input("اختر رقم النموذج أو (G=GitHub / K=مفاتيح / H=دليل / D=تبرع / Q=خروج) ❯ ").strip()
 
         if choice.lower() in ['q', 'exit']:
             print("مع السلامة!")
@@ -393,6 +443,8 @@ def main():
             add_api_key_prompt()
         elif choice.lower() == 'h':
             show_api_guide()
+        elif choice.lower() == 'd':
+            show_donation_screen()
         elif choice.isdigit():
             c_int = int(choice)
             if local_models and 1 <= c_int <= len(local_models):
