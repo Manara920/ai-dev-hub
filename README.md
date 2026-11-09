@@ -99,28 +99,54 @@ groq
 
 ---
 
-## 🛠️ دليل التثبيت الشامل حسب نظامك (Installation)
+## 🛠️ دليل التثبيت والتشغيل (Installation & Setup)
 
-### 1. 📱 أندرويد (Android عبر Termux)
+### 🚀 خيار البيئة الافتراضية الموصى به (Virtual Environment):
+للحفاظ على نظافة حزم بايثون وعزل المشروع:
 ```bash
-pkg update && pkg install -y git python
+cd ai-dev-hub
+bash setup_venv.sh
+```
+- **للدخول إلى البيئة لاحقاً في أي جلسة جديدة:**
+  ```bash
+  source ~/ai-dev-hub/.venv/bin/activate
+  ```
+- **أو استخدم المشغل التلقائي مباشرة:**
+  ```bash
+  ./run.sh
+  ```
+- **للخروج من البيئة الافتراضية:**
+  ```bash
+  deactivate
+  ```
+
+---
+
+### 📱 1. أندرويد (Android عبر Termux)
+```bash
+pkg update && pkg install -y git python llama-cpp
 git clone https://github.com/Manara920/ai-dev-hub.git
 cd ai-dev-hub
 bash install.sh
-./ai_hub.py
+./run.sh
 ```
 *ملاحظة: يقوم `install.sh` بإنشاء رابط رمزي (Symlink) لأداة `groq` داخل `$PREFIX/bin` ليتسنى لك استخدام أمر `groq` مباشرة من أي مسار.*
 
-### 2. 🐧 لينكس (Linux - Ubuntu / Debian / Arch / Fedora)
+> [!TIP]
+> **محركات النماذج المحلية في Termux:**
+> - **⚡ llama.cpp**: يعمل مباشرة في تيرمكس للأجهزة والهواتف بسرعة فائقة مع صيغ GGUF (`pkg install llama-cpp`).
+> - **🧠 AirLLM**: يعتمد على PyTorch و Transformers، ولذا **لا يثبت في تيرمكس مباشرة** بل يجب تشغيله داخل بيئة Linux حقيقية عبر PRoot (`pkg install proot-distro && proot-distro install ubuntu && proot-distro login ubuntu`).
+
+### 🐧 2. لينكس (Linux - Ubuntu / Debian / Arch / Fedora)
 ```bash
 git clone https://github.com/Manara920/ai-dev-hub.git
 cd ai-dev-hub
 chmod +x install.sh && ./install.sh
-./ai_hub.py
+./run.sh
 ```
 *ملاحظة: يدعم مثبت النظام مديري الحزم المختلفة (`apt`, `dnf`, `pacman`)، ويثبت الأمر `groq` في `~/.local/bin`.*
 
-### 3. 🪟 ويندوز (Windows)
+### 🪟 3. ويندوز (Windows)
 من موجه الأوامر (**CMD**):
 ```cmd
 git clone https://github.com/Manara920/ai-dev-hub.git

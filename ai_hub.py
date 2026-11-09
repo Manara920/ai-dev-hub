@@ -4,7 +4,7 @@
 ==============================================================================
  🏮 Al-Manara AI Dev Hub Pro - المنارة كريبتو
  محطة المطور والذكاء الاصطناعي الموحدة (Local & Cloud & GitHub)
- إصدار 2.2.0 - معمارية المحركات المتعددة والواجهة المدمجة الذكية
+ إصدار 2.3.0 - دعم تمييز النماذج السحابية، المحرك الموصى به، وتوجيهات AirLLM & venv
 ==============================================================================
 """
 
@@ -18,7 +18,7 @@ import platform
 import urllib.request
 from pathlib import Path
 
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 
 # إعداد المسارات
 ROOT_DIR = Path(__file__).resolve().parent
@@ -327,18 +327,23 @@ def download_manager_menu():
 
             tbl = Table(title="🌟 النماذج الموصى بها لجهازك (مكممة وجاهزة للتشغيل)", border_style="cyan", header_style="bold cyan")
             tbl.add_column("#", justify="center", style="bold yellow", width=4)
-            tbl.add_column("النموذج وميزاته", style="white")
+            tbl.add_column("النموذج والمحرك المقترح", style="white")
             tbl.add_column("الحجم", justify="center", style="cyan", width=10)
-            tbl.add_column("المحرك", justify="center", style="bold magenta", width=12)
             tbl.add_column("التوافق مع جهازك", justify="center", width=22)
 
             for i, m in enumerate(models, 1):
-                eng_tag = "🟢 llama.cpp" if m["engine"] == "llama.cpp" else "🟣 AirLLM"
+                if m["engine"] == "llama.cpp":
+                    eng_badge = "[bold green]⚡ llama.cpp[/bold green] [dim](محلي/Termux)[/dim]"
+                else:
+                    eng_badge = "[bold magenta]🧠 AirLLM[/bold magenta] [bold yellow](يحتاج Linux PRoot)[/bold yellow]"
+
                 if m["is_fit"]:
                     fit_style = "[bold green]✅ مثالي لجهازك[/bold green]"
                 else:
                     fit_style = f"[dim red]⚠️ {m['note']}[/dim red]"
-                tbl.add_row(str(i), f"[bold]{m['name']}[/bold]\n[dim]{m['desc']}[/dim]", f"{m['size_gb']} GB", eng_tag, fit_style)
+
+                model_cell = f"[bold cyan]{m['name']}[/bold cyan]  {eng_badge}\n[dim]{m['desc']}[/dim]"
+                tbl.add_row(str(i), model_cell, f"{m['size_gb']} GB", fit_style)
             
             console.print(tbl)
             console.print("[dim]• يمكنك تنزيل أي نموذج بالرقم، أو كتابة [bold yellow]S[/bold yellow] للبحث في Hugging Face عن أي نموذج GGUF آخر.[/dim]")
@@ -349,7 +354,8 @@ def download_manager_menu():
             print(f"العتاد: {hw['ram_total_gb']} GB RAM | قرص: {hw['disk_free_gb']} GB | الفئة: {hw['tier_title']}")
             for i, m in enumerate(models, 1):
                 status = "✅ متوافق" if m["is_fit"] else f"⚠️ {m['note']}"
-                print(f" [{i}] {m['name']} ({m['size_gb']} GB) [{m['engine']}] -> {status}")
+                eng_note = "llama.cpp (محلي)" if m["engine"] == "llama.cpp" else "AirLLM (Linux PRoot)"
+                print(f" [{i}] {m['name']} | المحرك: {eng_note} ({m['size_gb']} GB) -> {status}")
             print(" [S] بحث مخصص في Hugging Face")
             print(" [0] رجوع")
             choice = safe_input("اختر ❯ ").strip()
@@ -374,6 +380,16 @@ def download_manager_menu():
             print(f"\n[*] جاري بدء تنزيل: {chosen['name']}")
             print(f"[*] المستودع: https://huggingface.co/{repo_id}")
             print(f"[*] مسار الحفظ: {dest_file}")
+            if chosen.get("engine") == "airllm":
+                if USE_RICH:
+                    console.print(Panel(
+                        "[bold yellow]⚠️ ملاحظة هامة حول نموذج AirLLM:[/bold yellow]\n"
+                        "هذا النموذج يعمل بمحرك [bold magenta]AirLLM[/bold magenta] الذي يتطلب بيئة [bold cyan]Linux (proot-distro / Ubuntu)[/bold cyan].\n"
+                        "لا يمكن تشغيل AirLLM مباشرة في تيرمكس الخام، بل يتم الدخول للبيئة أولاً لتشغيله.",
+                        border_style="yellow", title="تنبيه المحرك"
+                    ))
+                else:
+                    print("\n[!] تنبيه: هذا النموذج مخصص لمحرك AirLLM ويتطلب بيئة Linux (proot-distro) لتشغيله في Termux.")
             
             confirm = safe_input("تأكيد بدء التحميل؟ [Y/n]: ").strip().lower()
             if confirm in ["", "y", "yes"]:
@@ -491,7 +507,7 @@ def get_local_models():
                     "path": str(d),
                     "size": f"{total_size:.1f} GB",
                     "engine": "airllm",
-                    "engine_label": "🧠 AirLLM (طبقات/RAM منخفض)"
+                    "engine_label": "🧠 AirLLM (طبقات / بيئة Linux)"
                 })
     return models
 
@@ -535,11 +551,44 @@ def run_local_model_interactive(chosen):
         print(f"  • المسار: {chosen['path']}")
         print("=" * 65)
 
-        # فحص هل مكتبة airllm مثبتة
+        # فحص هل البيئة الحالية Termux أصلية أم بيئة Linux
+        is_termux = "com.termux" in os.environ.get("PREFIX", "") or "com.termux" in sys.executable
+        in_proot = os.path.exists("/.proot") or os.environ.get("PROOT_TMP_DIR") is not None or (not is_termux and os.path.exists("/etc/os-release"))
+
+        if is_termux and not in_proot:
+            if USE_RICH:
+                console.print(Panel(
+                    "[bold red]⛔ تعذر تشغيل محرك AirLLM في بيئة Termux المباشرة[/bold red]\n\n"
+                    "محرك AirLLM يعتمد على مكتبات [bold cyan]PyTorch[/bold cyan] و [bold cyan]Transformers[/bold cyan]، "
+                    "ولا يمكن تثبيتها أو تشغيلها في تيرمكس مباشرة (بسبب قيود نظام أندرويد bionic libc).\n\n"
+                    "[bold green]💡 للتشغيل بنجاح، يجب تشغيله من داخل بيئة Linux حقيقية على هاتفك عبر PRoot:[/bold green]\n"
+                    "  1. تثبيت مدير توزيعات لينكس في تيرمكس:\n"
+                    "     [bold yellow]pkg install proot-distro[/bold yellow]\n"
+                    "  2. تثبيت توزيعة أوبونتو والدخول إليها:\n"
+                    "     [bold yellow]proot-distro install ubuntu[/bold yellow]\n"
+                    "     [bold yellow]proot-distro login ubuntu[/bold yellow]\n"
+                    "  3. داخل بيئة Ubuntu ثبت بايثون ومكتبة airllm:\n"
+                    "     [bold yellow]apt update && apt install python3 python3-pip git -y[/bold yellow]\n"
+                    "     [bold yellow]pip install airllm transformers torch[/bold yellow]\n"
+                    "  4. شغل هذا البرنامج ai_hub من داخل بيئة أوبونتو وسيعمل بكفاءة فائقة!",
+                    border_style="red",
+                    title="تنبيه بيئة التشغيل (Linux PRoot Required)"
+                ))
+            else:
+                print("\n[-] تنبيه: AirLLM لا يثبت ولا يعمل مباشرة داخل بيئة Termux الأصلية.")
+                print("    يجب تشغيله داخل بيئة Linux على تيرمكس عبر:")
+                print("    1. pkg install proot-distro")
+                print("    2. proot-distro install ubuntu && proot-distro login ubuntu")
+                print("    3. pip install airllm")
+                print("    ثم تشغيل البرنامج من داخل بيئة Ubuntu.")
+            safe_input("\nاضغط Enter للعودة...")
+            return
+
+        # فحص هل مكتبة airllm مثبتة في بيئة لينكس
         try:
             import airllm
         except ImportError:
-            print("\n[-] مكتبة AirLLM غير مثبتة في بيئة بايثون.")
+            print("\n[-] مكتبة AirLLM غير مثبتة في بيئة بايثون الحالية.")
             inst = safe_input("هل ترغب في تثبيت airllm الآن عبر pip؟ [Y/n]: ").strip().lower()
             if inst in ["", "y", "yes"]:
                 subprocess.run([sys.executable, "-m", "pip", "install", "airllm", "transformers", "torch"])
@@ -752,15 +801,27 @@ def cloud_models_menu():
         cloud_models = get_all_cloud_models()
 
         if USE_RICH:
-            console.print(Panel(Text("☁️ النماذج السحابية الفائقة (DeepSeek, Groq, Kimi, Claude)", style="bold blue"), border_style="blue"))
+            banner_text = Text.assemble(
+                ("☁️ النماذج السحابية الفائقة (DeepSeek, Groq, Kimi, Claude)\n", "bold blue"),
+                ("🟢 باقات مجانية بالكامل (Free)  |  💎 باقات مدفوعة (Paid)", "dim cyan")
+            )
+            console.print(Panel(banner_text, border_style="blue"))
             tbl = Table(show_header=True, header_style="bold blue", border_style="blue")
             tbl.add_column("#", justify="center", style="bold yellow", width=4)
             tbl.add_column("النموذج وميزاته", style="white")
             tbl.add_column("المزود (Provider)", style="cyan")
-            tbl.add_column("الباقة (Tier)", justify="center", style="bold magenta", width=18)
+            tbl.add_column("الباقة والتكلفة", justify="center", width=22)
 
             for i, c in enumerate(cloud_models, 1):
-                tbl.add_row(str(i), c["label"], c["provider_name"], c["tier"])
+                raw_tier = c.get("tier", "")
+                if "مجاني" in raw_tier or "Free" in raw_tier:
+                    tier_styled = f"[bold green]{raw_tier}[/bold green]"
+                elif "مدفوع" in raw_tier or "Paid" in raw_tier:
+                    tier_styled = f"[bold red]{raw_tier}[/bold red]"
+                else:
+                    tier_styled = f"[bold yellow]{raw_tier}[/bold yellow]"
+
+                tbl.add_row(str(i), c["label"], c["provider_name"], tier_styled)
 
             console.print(tbl)
             console.print(
@@ -770,9 +831,11 @@ def cloud_models_menu():
             )
             choice = safe_input("\nاختر رقم النموذج للبدء أو أمراً ❯ ").strip()
         else:
-            print("\n=== ☁️ النماذج السحابية ===")
+            print("\n=== ☁️ النماذج السحابية (مجانية ومدفوعة) ===")
             for i, c in enumerate(cloud_models, 1):
-                print(f" [{i}] {c['label']} [{c['provider_name']}] ({c['tier']})")
+                raw_tier = c.get("tier", "")
+                tier_tag = "[FREE]" if ("مجاني" in raw_tier or "Free" in raw_tier) else "[PAID]"
+                print(f" [{i}] {tier_tag} {c['label']} [{c['provider_name']}] ({raw_tier})")
             print("\n[K] إدارة المفاتيح | [H] دليل الـ API | [0] رجوع")
             choice = safe_input("اختر ❯ ").strip()
 
@@ -1046,7 +1109,10 @@ def cli_check():
     if hw["has_airllm"]:
         print("  [✓] airllm     (محرك تشغيل الطبقات Safetensors): متوفر")
     else:
-        print("  [-] airllm     (محرك تشغيل الطبقات Safetensors): غير مثبت (يمكن تثبيته عبر pip install airllm)")
+        if hw.get("is_termux", False):
+            print("  [-] airllm     (محرك تشغيل الطبقات Safetensors): غير مثبت (يتطلب بيئة Linux PRoot على Termux)")
+        else:
+            print("  [-] airllm     (محرك تشغيل الطبقات Safetensors): غير مثبت (يمكن تثبيته عبر pip install airllm)")
 
     # Check Groq
     if shutil.which("groq") or (ROOT_DIR / "bin" / "groq").exists():
@@ -1088,7 +1154,9 @@ def cli_list():
 
     print("\n☁️ النماذج السحابية (Cloud Models):")
     for j, c in enumerate(cloud_models, 1):
-        print(f"  [{j}] {c['label']} [{c['provider_name']}] ({c['tier']})")
+        raw_tier = c.get("tier", "")
+        tag = "🟢 [مجاني/Free]" if ("مجاني" in raw_tier or "Free" in raw_tier) else "💎 [مدفوع/Paid]"
+        print(f"  [{j}] {tag} {c['label']} [{c['provider_name']}] ({c['tier']})")
 
 # ==============================================================================
 # 🏮 الواجهة الرئيسية المضغوطة والأنيقة (Compact Modular Dashboard)
