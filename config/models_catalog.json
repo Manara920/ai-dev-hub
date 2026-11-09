@@ -1,0 +1,74 @@
+[
+  {
+    "id": "qwen2.5-coder-1.5b",
+    "name": "Qwen 2.5 Coder 1.5B Instruct",
+    "desc": "النموذج البرمجي الأفضل والأنسب للهواتف والأجهزة ذات الذاكرة المحدودة",
+    "repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+    "preferred_file": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+    "size_gb": 1.1,
+    "min_ram_gb": 2.5,
+    "rec_tier": "low",
+    "engine": "llama.cpp",
+    "tags": ["code", "lightweight", "arabic-support"]
+  },
+  {
+    "id": "llama-3.2-3b",
+    "name": "Llama 3.2 3B Instruct",
+    "desc": "أحدث وأقوى نموذج خفيف من Meta، أداء مذهل في الفهم والتحليل السريع",
+    "repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+    "preferred_file": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+    "size_gb": 2.0,
+    "min_ram_gb": 4.0,
+    "rec_tier": "medium",
+    "engine": "llama.cpp",
+    "tags": ["general", "fast", "multilingual"]
+  },
+  {
+    "id": "qwen2.5-7b",
+    "name": "Qwen 2.5 7B Instruct",
+    "desc": "النموذج المتوازن الشامل، ممتاز في البرمجة واللغة العربية وحل المسائل المعقدة",
+    "repo": "Qwen/Qwen2.5-7B-Instruct-GGUF",
+    "preferred_file": "qwen2.5-7b-instruct-q4_k_m.gguf",
+    "size_gb": 4.7,
+    "min_ram_gb": 6.5,
+    "rec_tier": "high",
+    "engine": "llama.cpp",
+    "tags": ["general", "coding", "strong-arabic"]
+  },
+  {
+    "id": "deepseek-r1-distill-qwen-7b",
+    "name": "DeepSeek R1 Distill Qwen 7B",
+    "desc": "تفكير واستدلال منطقي عميق جداً من DeepSeek مكمم وجاهز للهواتف والأجهزة",
+    "repo": "bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+    "preferred_file": "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf",
+    "size_gb": 4.7,
+    "min_ram_gb": 7.0,
+    "rec_tier": "high",
+    "engine": "llama.cpp",
+    "tags": ["reasoning", "math", "code"]
+  },
+  {
+    "id": "deepseek-r1-distill-qwen-14b",
+    "name": "DeepSeek R1 Distill Qwen 14B",
+    "desc": "قدرات تفكير متقدمة جداً للأجهزة القوية (> 12GB RAM) أو عبر تقنية الطبقات",
+    "repo": "bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF",
+    "preferred_file": "DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf",
+    "size_gb": 9.0,
+    "min_ram_gb": 12.0,
+    "rec_tier": "ultra",
+    "engine": "llama.cpp",
+    "tags": ["reasoning", "heavy"]
+  },
+  {
+    "id": "airllm-llama3-8b",
+    "name": "Meta Llama 3 8B (AirLLM / Safetensors)",
+    "desc": "نموذج يعمل بطريقة تحميل الطبقات تدريجياً لتقليل استهلاك الـ RAM على الحواسيب",
+    "repo": "meta-llama/Meta-Llama-3-8B-Instruct",
+    "preferred_file": "safetensors",
+    "size_gb": 16.0,
+    "min_ram_gb": 4.0,
+    "rec_tier": "ultra",
+    "engine": "airllm",
+    "tags": ["airllm", "safetensors", "ultra-low-ram"]
+  }
+]
