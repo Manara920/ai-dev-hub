@@ -18,8 +18,8 @@ class AirLLMWrapper:
     """Wrapper class for loading and running AirLLM models."""
 
     def __init__(self, model_path: str):
-        is_termux = "com.termux" in os.environ.get("PREFIX", "") or "com.termux" in sys.executable
-        in_proot = os.path.exists("/.proot") or os.environ.get("PROOT_TMP_DIR") is not None or (not is_termux and os.path.exists("/etc/os-release"))
+        in_proot = os.path.exists("/.proot") or os.environ.get("PROOT_TMP_DIR") is not None or os.path.exists("/etc/os-release")
+        is_termux = ("com.termux" in os.environ.get("PREFIX", "") or "com.termux" in sys.executable) and not in_proot
 
         if is_termux and not in_proot:
             raise RuntimeError(

@@ -160,10 +160,11 @@ def detect_hardware():
     except Exception:
         disk_free_gb = 10.0
 
-    # 3. المعمارية وعدد الأنوية
+    # 3. المعمارية وعدد الأنوية ونظام التشغيل
     arch = platform.machine()
     cores = os.cpu_count() or 4
-    is_termux = "com.termux" in os.environ.get("PREFIX", "") or "com.termux" in sys.executable
+    is_proot = os.path.exists("/.proot") or os.environ.get("PROOT_TMP_DIR") is not None or os.path.exists("/etc/os-release")
+    is_termux = ("com.termux" in os.environ.get("PREFIX", "") or "com.termux" in sys.executable) and not is_proot
 
     # 4. محركات التشغيل المتوفرة
     has_llama = shutil.which("llama-cli") is not None

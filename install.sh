@@ -15,25 +15,56 @@ echo "=========================================================="
 
 # 1. فحص بيئة التشغيل وتثبيت المتطلبات الأساسية
 BIN_DIR=""
-if [ -n "$TERMUX_VERSION" ] || [ -d "/data/data/com.termux/files" ]; then
-    echo "[*] تم التعرف على بيئة: Android (Termux)"
+IS_PROOT=0
+IS_NATIVE_TERMUX=0
+
+# التحقق الدقيق: هل نحن داخل بيئة Linux حقيقية (عادية أو PRoot داخل Termux)؟
+if [ -f "/etc/os-release" ] || [ -e "/.proot" ] || [ -n "$PROOT_TMP_DIR" ]; then
+    # بيئة لينكس (أوبونتو، ديبيان، آرش، إلخ - بما في ذلك proot-distro في تيرمكس)
+    if [ -n "$TERMUX_VERSION" ] || [ -d "/data/data/com.termux/files" ]; then
+        echo "[*] تم التعرف على بيئة: Linux (بيئة PRoot داخل Termux) 🐧📱"
+        IS_PROOT=1
+    else
+        echo "[*] تم التعرف على بيئة: Linux 🐧"
+    fi
+
+    # تحديد صلاحيات root أو sudo تلقائياً
+    SUDO_CMD=""
+    if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+        SUDO_CMD="sudo"
+    fi
+
+    echo "[*] جاري التحقق من الحزم الأساسية عبر مدير حزم لينكس..."
+    if command -v apt-get >/dev/null 2>&1; then
+        echo "[*] استخدام مدير الحزم apt..."
+        $SUDO_CMD apt-get update -y || true
+        $SUDO_CMD apt-get install -y python3 python3-pip python3-venv git curl || true
+    elif command -v dnf >/dev/null 2>&1; then
+        echo "[*] استخدام مدير الحزم dnf..."
+        $SUDO_CMD dnf install -y python3 python3-pip git || true
+    elif command -v pacman >/dev/null 2>&1; then
+        echo "[*] استخدام مدير الحزم pacman..."
+        $SUDO_CMD pacman -Sy --noconfirm python python-pip git || true
+    fi
+
+    if [ "$(id -u)" -eq 0 ]; then
+        BIN_DIR="/usr/local/bin"
+    else
+        BIN_DIR="$HOME/.local/bin"
+    fi
+    mkdir -p "$BIN_DIR"
+
+elif [ -n "$TERMUX_VERSION" ] || [ -d "/data/data/com.termux/files/usr" ]; then
+    # بيئة Termux الأصلية المباشرة (Android Bionic)
+    echo "[*] تم التعرف على بيئة: Android (Termux الأصلي) 📱"
+    IS_NATIVE_TERMUX=1
     echo "[*] جاري التحقق من الحزم الأساسية عبر pkg..."
     pkg update -y || true
     pkg install -y python git llama-cpp 2>/dev/null || pkg install -y python git
     BIN_DIR="$PREFIX/bin"
 else
-    echo "[*] تم التعرف على بيئة: Linux"
-    echo "[*] جاري التحقق من الحزم الأساسية..."
-    if command -v apt-get >/dev/null 2>&1; then
-        echo "[*] استخدام مدير الحزم apt..."
-        sudo apt-get update -y && sudo apt-get install -y python3 python3-pip python3-venv git || true
-    elif command -v dnf >/dev/null 2>&1; then
-        echo "[*] استخدام مدير الحزم dnf..."
-        sudo dnf install -y python3 python3-pip git || true
-    elif command -v pacman >/dev/null 2>&1; then
-        echo "[*] استخدام مدير الحزم pacman..."
-        sudo pacman -Sy --noconfirm python python-pip git || true
-    fi
+    # افتراضي لأي نظام شبيه بيونكس
+    echo "[*] تم التعرف على بيئة: Unix / Linux"
     BIN_DIR="$HOME/.local/bin"
     mkdir -p "$BIN_DIR"
 fi
