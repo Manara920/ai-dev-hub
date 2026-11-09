@@ -45,6 +45,14 @@
 - شاشة تبرعات تفاعلية بالضغط على `[D]` تدعم شبكات **USDT (TRC-20)** و **EVM (ETH/BNB/Arbitrum)** و **Solana** و **Bitcoin**.
 - ملف إعدادات مستقل [`config/brand.json`](config/brand.json) لتخصيص الروابط وعناوين المحافظ بسهولة.
 
+### 6. 🧪 مفسر الأكواد المعزول ومختبر الوكلاء (OpenSandbox & Interpreter):
+- دمج تقنية **[OpenSandbox](https://github.com/opensandbox-group/OpenSandbox)** لتنفيذ الأكواد التي يولدها الذكاء الاصطناعي بأمان تام.
+- **حلقة التصحيح الذاتي (Self-Healing Loop):** في حال حدوث خطأ في الكود، يقرأ النموذج رسالة الخطأ تلقائياً ويعيد كتابته واختباره داخل الـ Sandbox حتى ينجح!
+- **معمارية هجينة ومرنة:**
+  - اتصال تلقائي بسيرفر OpenSandbox الخارجي (Docker / MicroVMs) عبر `OPENSANDBOX_ENDPOINT` في `config/.env`.
+  - مشغل محلي فوري وآمن (Local Safe Fallback) يعمل تلقائياً ومباشرة على الهواتف وبيئات Termux بدون الحاجة لأي خوادم خارجية.
+- فحص واختبار سلامة مشاريع بايثون داخل الـ Sandbox قبل عمل Commit و Push إلى GitHub.
+
 ---
 
 ## ⚡ خيارات سطر الأوامر (CLI Flags & Options)

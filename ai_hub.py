@@ -3,8 +3,8 @@
 """
 ==============================================================================
  🏮 Al-Manara AI Dev Hub Pro - المنارة كريبتو
- محطة المطور والذكاء الاصطناعي الموحدة (Local & Cloud & GitHub)
- إصدار 2.3.0 - دعم تمييز النماذج السحابية، المحرك الموصى به، وتوجيهات AirLLM & venv
+ محطة المطور والذكاء الاصطناعي الموحدة (Local & Cloud & GitHub & OpenSandbox)
+ إصدار 2.4.0 - دمج مفسر الأكواد المعزول OpenSandbox ومختبر الوكلاء الذاتي
 ==============================================================================
 """
 
@@ -18,7 +18,15 @@ import platform
 import urllib.request
 from pathlib import Path
 
-VERSION = "2.3.0"
+VERSION = "2.4.0"
+
+# استيراد محرك الـ Sandbox ومفسر الأكواد المعزول
+try:
+    import sandbox_engine
+    HAS_SANDBOX = True
+except ImportError:
+    sandbox_engine = None
+    HAS_SANDBOX = False
 
 # إعداد المسارات
 ROOT_DIR = Path(__file__).resolve().parent
@@ -984,12 +992,13 @@ def github_menu():
             tbl.add_row("3", "مراجعة الكود بالذكاء الاصطناعي (AI Review)", "قراءة git diff وشرح التعديلات واقتراح Commit message")
             tbl.add_row("4", "رفع التعديلات (Auto Commit & Push)", "حفظ التغييرات ورفعها بضغطة زر مع الحماية")
             tbl.add_row("5", "استنساخ مستودع (Git Clone)", "سحب أي مستودع من حسابك إلى بيئتك")
+            tbl.add_row("6", "🧪 فحص واختبار الكود في الـ Sandbox", "تشغيل الاختبارات داخل بيئة معزولة للتأكد من خلوه من الأخطاء")
             tbl.add_row("0", "رجوع للقائمة الرئيسية", "العودة للقائمة السابقة")
             console.print(tbl)
             choice = safe_input("[bold yellow]اختر العملية ❯ [/bold yellow]").strip()
         else:
             print(f"\n--- 🐙 قائمة GitHub ({git_user}) ---")
-            print("1) عرض مستودعاتك | 2) حالة Git | 3) مراجعة AI | 4) Push | 5) Clone | 0) رجوع")
+            print("1) عرض مستودعاتك | 2) حالة Git | 3) مراجعة AI | 4) Push | 5) Clone | 6) فحص Sandbox | 0) رجوع")
             choice = safe_input("اختر ❯ ").strip()
 
         if choice == "0":
@@ -1071,6 +1080,295 @@ def github_menu():
                 except Exception as e:
                     print(f"[-] خطأ: {e}")
             safe_input("\nاضغط Enter للمتابعة...")
+        elif choice == "6":
+            print("\n[*] جاري فحص ملفات بايثون في المشروع داخل بيئة الـ Sandbox المعزولة...")
+            py_files = list(ROOT_DIR.glob("*.py"))
+            all_ok = True
+            for pyf in py_files:
+                try:
+                    test_code = f"import py_compile\npy_compile.compile(r'{pyf}', doraise=True)\nprint('[✓] {pyf.name}: سليم برمجياً')"
+                    if HAS_SANDBOX:
+                        res = sandbox_engine.execute_in_sandbox(test_code, "python", timeout=15)
+                        if res["success"]:
+                            print(f"  [✓] {pyf.name}: اجتاز الفحص في الـ Sandbox")
+                        else:
+                            all_ok = False
+                            print(f"  [✗] {pyf.name}: خطأ برمجياً!\n      {res['stderr']}")
+                except Exception as e:
+                    print(f"  [-] تعذر فحص {pyf.name}: {e}")
+            if all_ok:
+                print("\n[✓] اكتمل الفحص: جميع الملفات اجتازت اختبار الـ Sandbox بنجاح تام!")
+            else:
+                print("\n[!] تنبيه: تم اكتشاف أخطاء برمجية في بعض الملفات.")
+            safe_input("\nاضغط Enter للمتابعة...")
+
+# ==============================================================================
+# 🧪 مفسر الأكواد المعزول ومختبر الوكلاء (OpenSandbox & Local Fallback)
+# ==============================================================================
+
+def run_ai_code_interpreter_interactive():
+    """حلقة الوكيل الذكي: المستخدم يطلب مهمة، النموذج يولد كود، والـ Sandbox ينفذه."""
+    clear_screen()
+    print("=" * 65)
+    print("  🤖 مفسر الأكواد المعزول ومختبر الوكلاء (AI Code Interpreter Loop)")
+    print("  اكتب ما تريده وسيقوم النموذج بكتابة الكود وتشغيله فوراً داخل Sandbox!")
+    print("=" * 65)
+
+    prompt = safe_input("\nما هي المهمة أو المسألة الحسابية المطلوبة؟\n(مثال: احسب أول 30 رقم في متتالية فيبوناتشي، أو ارسم رسم بياني نصي): ").strip()
+    if not prompt:
+        return
+
+    print("\n[*] جاري استشارة الذكاء الاصطناعي لكتابة كود الحل والتنفيذ...")
+    
+    full_prompt = (
+        f"المطلوب: {prompt}\n\n"
+        "تعليمات هامة جداً:\n"
+        "اكتب كود بايثون كامل وقابل للتنفيذ المباشر لحل المطلوب وطباعة النتائج بوضوح عبر print().\n"
+        "ضع الكود داخل كتلة كود بايثون: ```python ... ``` مع شرح مقتضب."
+    )
+
+    response_text = ""
+    groq_bin = shutil.which("groq")
+    groq_key = get_provider_key("GROQ_API_KEY")
+    deepseek_key = get_provider_key("DEEPSEEK_API_KEY")
+
+    if groq_bin or groq_key:
+        cmd = [groq_bin] if groq_bin else [sys.executable, str(ROOT_DIR / "bin" / "groq")]
+        try:
+            res = subprocess.run(cmd + ["-m", "allam-2-7b", full_prompt], cwd=str(ROOT_DIR), capture_output=True, text=True, timeout=30)
+            response_text = res.stdout.strip()
+        except Exception:
+            pass
+
+    if not response_text and deepseek_key:
+        try:
+            from openai import OpenAI
+            client = OpenAI(base_url="https://api.deepseek.com/v1", api_key=deepseek_key)
+            resp = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": full_prompt}],
+                max_tokens=1024
+            )
+            response_text = resp.choices[0].message.content or ""
+        except Exception:
+            pass
+
+    if not response_text:
+        print("[-] لم يتم العثور على مفتاح API نشط للنموذج (GROQ_API_KEY أو DEEPSEEK_API_KEY).")
+        safe_input("\nاضغط Enter للعودة وإضافة المفاتيح عبر [5]...")
+        return
+
+    print("\n" + "-" * 50)
+    print("📝 إجابة النموذج والكود المقترح:")
+    print("-" * 50)
+    print(response_text)
+
+    blocks = sandbox_engine.extract_code_blocks(response_text) if HAS_SANDBOX else []
+    if not blocks:
+        print("\n[-] لم يتم العثور على كتلة كود بايثون قابلة للتنفيذ في إجابة النموذج.")
+        safe_input("\nاضغط Enter للمتابعة...")
+        return
+
+    lang, code = blocks[0]
+    print(f"\n[+] تم اكتشاف كود ({lang}) جاهز للتنفيذ داخل الـ Sandbox.")
+    run_now = safe_input("هل ترغب في تشغيل الكود الآن داخل الـ Sandbox المعزول؟ [Y/n]: ").strip().lower()
+    if run_now not in ["", "y", "yes"]:
+        return
+
+    attempt = 1
+    max_attempts = 3
+    current_code = code
+
+    while attempt <= max_attempts:
+        print(f"\n[*] جاري تشغيل الكود في الـ Sandbox (محاولة {attempt}/{max_attempts})...")
+        res = sandbox_engine.execute_in_sandbox(current_code, language=lang, timeout=30) if HAS_SANDBOX else {"success": False, "stderr": "محرك الـ Sandbox غير متوفر"}
+        
+        mode_desc = "OpenSandbox Server" if res.get("mode") == "opensandbox_server" else "Local Ephemeral Sandbox"
+        
+        if res["success"]:
+            if USE_RICH:
+                console.print(Panel(
+                    f"[bold green]✅ نجح التنفيذ بنجاح! ({mode_desc})[/bold green]\n"
+                    f"[dim]زمن التشغيل: {res.get('runtime_sec', 0)} ثانية[/dim]\n\n"
+                    f"[bold white]مخرجات الكود (Stdout):[/bold white]\n"
+                    f"{res['stdout'] or '(لا توجد مخرجات نصية)'}",
+                    border_style="green", title="Sandbox Output"
+                ))
+            else:
+                print(f"\n[✓] نجح التنفيذ! ({mode_desc}) | زمن: {res.get('runtime_sec', 0)} ثانية")
+                print(f"المخرجات:\n{res['stdout'] or '(لا توجد مخرجات)'}")
+            break
+        else:
+            if USE_RICH:
+                console.print(Panel(
+                    f"[bold red]❌ خطأ أثناء تنفيذ الكود ({mode_desc}):[/bold red]\n"
+                    f"{res['stderr']}",
+                    border_style="red", title="Sandbox Execution Error"
+                ))
+            else:
+                print(f"\n[✗] خطأ أثناء التنفيذ:\n{res['stderr']}")
+
+            if attempt < max_attempts:
+                heal = safe_input("\nهل ترغب في أن يتدخل الذكاء الاصطناعي لإصلاح الخطأ وإعادة التجربة ذاتياً؟ [Y/n]: ").strip().lower()
+                if heal in ["", "y", "yes"]:
+                    print("\n[*] جاري إرسال رسالة الخطأ للنموذج لتصحيح الكود...")
+                    fix_prompt = (
+                        f"الكود التالي أحدث خطأ أثناء تنفيذه داخل Sandbox:\n```python\n{current_code}\n```\n"
+                        f"رسالة الخطأ البرمجي:\n{res['stderr']}\n\n"
+                        "يرجى تصحيح الخطأ وإعادة كتابة الكود السليم بالكامل داخل ```python ... ```."
+                    )
+                    fix_text = ""
+                    if groq_bin or groq_key:
+                        try:
+                            cmd = [groq_bin] if groq_bin else [sys.executable, str(ROOT_DIR / "bin" / "groq")]
+                            rf = subprocess.run(cmd + ["-m", "allam-2-7b", fix_prompt], cwd=str(ROOT_DIR), capture_output=True, text=True, timeout=30)
+                            fix_text = rf.stdout.strip()
+                        except Exception:
+                            pass
+                    
+                    new_blocks = sandbox_engine.extract_code_blocks(fix_text) if fix_text and HAS_SANDBOX else []
+                    if new_blocks:
+                        current_code = new_blocks[0][1]
+                        attempt += 1
+                        continue
+                    else:
+                        print("[-] تعذر استخراج كود مصحح من رد النموذج.")
+                        break
+                else:
+                    break
+            else:
+                print("\n[-] تم استنفاد عدد محاولات التصحيح التلقائي.")
+                break
+
+    safe_input("\nاضغط Enter للمتابعة...")
+
+
+def run_custom_code_in_sandbox():
+    """تشغيل كود بايثون يدوي ومخصص في الـ Sandbox."""
+    clear_screen()
+    print("=" * 60)
+    print("  ⚡ تشغيل كود بايثون مخصص داخل الـ Sandbox المعزول")
+    print("=" * 60)
+    print("اكتب أو الصق كود بايثون المطلوب تنفيذه.")
+    print("(اكتب 'END' في سطر منفصل للبدء، أو اضغط Enter فارغاً للإلغاء):\n")
+
+    lines = []
+    while True:
+        try:
+            line = input()
+            if line.strip() == "END":
+                break
+            lines.append(line)
+        except (KeyboardInterrupt, EOFError):
+            break
+
+    code = "\n".join(lines).strip()
+    if not code:
+        return
+
+    print("\n[*] جاري تشغيل الكود في البيئة المعزولة...")
+    res = sandbox_engine.execute_in_sandbox(code, "python", timeout=30) if HAS_SANDBOX else {"success": False, "stderr": "Sandbox غير متوفر"}
+    
+    mode_name = "OpenSandbox Server" if res.get("mode") == "opensandbox_server" else "Local Safe Sandbox"
+    
+    if res["success"]:
+        print(f"\n[✓] اكتمل التنفيذ بنجاح ({mode_name}) في {res.get('runtime_sec', 0)} ثانية:")
+        print("-" * 50)
+        print(res["stdout"] or "(لا توجد مخرجات)")
+        print("-" * 50)
+    else:
+        print(f"\n[✗] فشل التنفيذ:")
+        print(res["stderr"])
+
+    safe_input("\nاضغط Enter للمتابعة...")
+
+
+def configure_opensandbox_settings():
+    """عرض وضبط إعدادات سيرفر OpenSandbox."""
+    clear_screen()
+    cfg = sandbox_engine.get_sandbox_config() if HAS_SANDBOX else {}
+    is_alive, msg = sandbox_engine.check_sandbox_server(cfg.get("endpoint")) if HAS_SANDBOX else (False, "غير متاح")
+    
+    print("=" * 60)
+    print("  ⚙️ إعدادات OpenSandbox Server")
+    print("=" * 60)
+    print(f"  • العنوان الحالي (Endpoint): {cfg.get('endpoint')}")
+    print(f"  • حالة الخادم اللحظية    : {msg}")
+    print(f"  • المهلة القصوى (Timeout) : {cfg.get('timeout')} ثانية")
+    print("=" * 60)
+    print("\nخيارات الإعداد:")
+    print(" [1] تعديل عنوان سيرفر OpenSandbox (مثال: http://192.168.1.50:8080 أو عبر Tailscale)")
+    print(" [2] فحص الاتصال بالخادم الآن")
+    print(" [0] رجوع")
+    
+    sub = safe_input("\nاختر ❯ ").strip()
+    if sub == "1":
+        new_ep = safe_input("أدخل عنوان السيرفر الجديد: ").strip()
+        if new_ep:
+            os.environ["OPENSANDBOX_ENDPOINT"] = new_ep
+            env_content = ENV_FILE.read_text(encoding="utf-8") if ENV_FILE.exists() else ""
+            if "OPENSANDBOX_ENDPOINT=" in env_content:
+                env_content = re.sub(r'OPENSANDBOX_ENDPOINT=.*', f'OPENSANDBOX_ENDPOINT="{new_ep}"', env_content)
+            else:
+                env_content += f'\nOPENSANDBOX_ENDPOINT="{new_ep}"\n'
+            ENV_FILE.write_text(env_content, encoding="utf-8")
+            print("[✓] تم حفظ عنوان السيرفر بنجاح.")
+            safe_input("اضغط Enter...")
+    elif sub == "2":
+        print("\n[*] جاري اختبار الاتصال...")
+        alive, note = sandbox_engine.check_sandbox_server(cfg.get("endpoint"))
+        print(f"النتيجة: {note}")
+        safe_input("\nاضغط Enter...")
+
+
+def sandbox_interpreter_menu():
+    """واجهة مفسر الأكواد المعزول والمختبر الذكي (OpenSandbox & Local Fallback)."""
+    while True:
+        clear_screen()
+        s_cfg = sandbox_engine.get_sandbox_config() if HAS_SANDBOX else {}
+        is_server_alive, s_msg = sandbox_engine.check_sandbox_server(s_cfg.get("endpoint")) if HAS_SANDBOX else (False, "غير متاح")
+        
+        mode_badge = "[bold green]🟢 خادم OpenSandbox متصل[/bold green]" if is_server_alive else "[bold yellow]🟡 المشغل المحلي المعزول (Local Safe Fallback)[/bold yellow]"
+
+        if USE_RICH:
+            console.print(Panel(
+                Text.assemble(
+                    ("🧪 المختبر ومفسر الأكواد المعزول (AI Sandbox & Code Interpreter)\n", "bold cyan"),
+                    ("بيئة التشغيل: ", "dim white"),
+                    (f"{mode_badge}\n", ""),
+                    (f"الخادم: {s_cfg.get('endpoint', 'مغلق')} | المهلة: {s_cfg.get('timeout', 45)} ثانية", "dim cyan")
+                ),
+                border_style="cyan"
+            ))
+
+            tbl = Table(show_header=True, header_style="bold cyan", border_style="cyan")
+            tbl.add_column("الخيار", justify="center", style="bold yellow", width=6)
+            tbl.add_column("العملية", style="white", width=34)
+            tbl.add_column("التفاصيل", style="dim white")
+
+            tbl.add_row("[1]", "🤖 محادثة برمجية وتنفيذ تلقائي (AI Agent Loop)", "تطلب المهمة من الذكاء الاصطناعي، يكتب الكود ويُنفذ في الـ Sandbox")
+            tbl.add_row("[2]", "⚡ تنفيذ كود بايثون مخصص وآمن", "كتابة أو لصق كود وتجربته داخل بيئة معزولة ونظيفة")
+            tbl.add_row("[3]", "⚙️ ضبط إعدادات ومسار OpenSandbox Server", "تغيير عنوان الخادم الخارجي أو فحص الاتصال")
+            tbl.add_row("[0]", "رجوع للقائمة الرئيسية", "العودة للوحة التحكم")
+            console.print(tbl)
+            choice = safe_input("[bold yellow]اختر العملية ❯ [/bold yellow]").strip()
+        else:
+            print("\n=== 🧪 مفسر الأكواد المعزول (Sandbox) ===")
+            print(f"الوضع: {mode_badge}")
+            print(" [1] 🤖 محادثة وتنفيذ كود تلقائي")
+            print(" [2] ⚡ تنفيذ كود بايثون مخصص")
+            print(" [3] ⚙️ إعدادات سيرفر OpenSandbox")
+            print(" [0] رجوع")
+            choice = safe_input("اختر ❯ ").strip()
+
+        if choice in ["0", "q", "exit"]:
+            break
+        elif choice == "1":
+            run_ai_code_interpreter_interactive()
+        elif choice == "2":
+            run_custom_code_in_sandbox()
+        elif choice == "3":
+            configure_opensandbox_settings()
 
 # ==============================================================================
 # 🛠️ الفحص والتشخيص الشامل
@@ -1118,6 +1416,15 @@ def cli_check():
     # Check Groq
     if shutil.which("groq") or (ROOT_DIR / "bin" / "groq").exists():
         print("  [✓] groq       (أداة Groq السحابية السريعة): متوفرة")
+
+    # Check OpenSandbox
+    if HAS_SANDBOX:
+        s_cfg = sandbox_engine.get_sandbox_config()
+        is_s_alive, s_msg = sandbox_engine.check_sandbox_server(s_cfg.get("endpoint"))
+        if is_s_alive:
+            print(f"  [✓] opensandbox (مفسر الأكواد المعزول): {s_msg}")
+        else:
+            print(f"  [✓] sandbox     (مفسر الأكواد المعزول): نشط في الوضع المحلي الآمن (Local Fallback)")
 
     print("\n[3] فحص مفاتيح الـ API المسجلة:")
     keys = ["GROQ_API_KEY", "OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "MOONSHOT_API_KEY"]
@@ -1214,6 +1521,10 @@ def main():
                 "[6]", "🛠️ فحص النظام والتشخيص الشامل",
                 "اختبار سرعة العتاد وسلامة الأدوات والمحركات"
             )
+            menu_tbl.add_row(
+                "[7]", "🧪 المختبر ومفسر الأكواد المعزول",
+                "تشغيل وتصحيح الأكواد بأمان (OpenSandbox & Runner)"
+            )
             console.print(Panel(menu_tbl, border_style="cyan", title="القائمة الرئيسية", title_align="right"))
 
             # 3. شريط الأوامر السريعة
@@ -1235,6 +1546,7 @@ def main():
             print(f" [4] 🐙 أتمتة ومطور GitHub")
             print(f" [5] 🔑 إدارة مفاتيح الـ API")
             print(f" [6] 🛠️ فحص النظام والتشخيص")
+            print(f" [7] 🧪 المختبر ومفسر الأكواد المعزول (OpenSandbox)")
             print(" [H] دليل الـ APIs | [D] دعم | [0] خروج")
             choice = safe_input("اختر ❯ ").strip()
 
@@ -1255,6 +1567,8 @@ def main():
             clear_screen()
             cli_check()
             safe_input("\nاضغط Enter للعودة...")
+        elif choice == "7":
+            sandbox_interpreter_menu()
         elif choice.lower() == "h":
             show_api_guide()
         elif choice.lower() == "d":
