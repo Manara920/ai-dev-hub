@@ -1,0 +1,24 @@
+# Sensitive files & API Keys
+.env
+config/.env
+*.env
+*.key
+*.token
+
+# Local Models & Data
+models/
+*.gguf
+*.bin
+*.pt
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+venv/
+.venv/
+
+# System and OS files
+.DS_Store
+Thumbs.db
