@@ -47,11 +47,16 @@ echo "  [2] التثبيت المباشر في بيئة النظام / تيرم�
 echo "----------------------------------------------------------"
 
 ENV_CHOICE="1"
-if [ -t 0 ]; then
-    read -r -p "اختر [1 أو 2] (الافتراضي 1): " USER_INPUT_CHOICE
-    if [ "$USER_INPUT_CHOICE" = "2" ]; then
-        ENV_CHOICE="2"
-    fi
+USER_INPUT_CHOICE=""
+
+if [ -c /dev/tty ]; then
+    read -r -p "اختر [1 أو 2] (الافتراضي 1): " USER_INPUT_CHOICE </dev/tty || USER_INPUT_CHOICE="1"
+else
+    read -r -p "اختر [1 أو 2] (الافتراضي 1): " USER_INPUT_CHOICE || USER_INPUT_CHOICE="1"
+fi
+
+if [ "$USER_INPUT_CHOICE" = "2" ]; then
+    ENV_CHOICE="2"
 fi
 
 if [ "$ENV_CHOICE" = "1" ]; then
