@@ -3,7 +3,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Brand-Al--Manara%20Crypto-gold?style=for-the-badge&logo=bitcoin" alt="Brand">
-  <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Termux%20%7C%20macOS-blue?style=for-the-badge" alt="Platform">
+  <img src="https://img.shields.io/badge/Platforms-Android%20%7C%20Linux%20%7C%20Windows-blue?style=for-the-badge" alt="Platforms">
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License">
 </p>
 
@@ -11,45 +11,85 @@
 
 ## 📌 نبذة عن المشروع (About)
 
-**Al-Manara AI Dev Hub Pro** هو بيئة عمل طرفية متطورة برعاية **المنارة كريبتو (Al-Manara Crypto)** تجمع بين أحدث تقنيات **الذكاء الاصطناعي**، **تطوير البلوكشين والبرمجة**، و **أتمتة مستودعات GitHub** في واجهة سطر أوامر تفاعلية واحدة.
-
-المشروع مصمم ليعمل بكفاءة فائقة على أجهزة **Termux (أندرويد)**، وخوادم **Linux (Debian/Ubuntu)**، وأنظمة **macOS**.
-
----
-
-## 🌟 الميزات الرئيسية (Features)
-
-1. **🏠 تشغيل النماذج المحلية بدون إنترنت (Offline GGUF)**:
-   - تشغيل نماذج مثل Qwen, Llama 3, Ministral محلياً عبر محرك `llama.cpp` السريع.
-2. **☁️ مركز النماذج السحابية (Cloud Hub)**:
-   - وصول مباشر لنماذج **DeepSeek (V3 & R1)**، و **Kimi Moonshot**، و **Groq (علّام 2 العربي)**، و **Claude 3.7** و **GPT-4o**.
-3. **🐙 تكامل وأتمتة GitHub**:
-   - متابعة المستودعات، قراءة `git diff`، ومراجعة الأكواد بالذكاء الاصطناعي، والرفع التلقائي (`Auto Push`).
-4. **🪙 دعم العملات الرقمية والتبرعات**:
-   - شاشة مخصصة لجمع التبرعات عبر شبكات TRC20, EVM, Solana, Bitcoin لدعم استمرارية التطوير.
+**Al-Manara AI Dev Hub Pro** هو بيئة عمل طرفية متطورة برعاية **المنارة كريبتو (Al-Manara Crypto)** تجمع بين:
+1. **النماذج المحلية (Offline)**: تشغيل نماذج الذكاء الاصطناعي المكممة بصيغة `GGUF` مباشرة على معالج جهازك دون إنترنت عبر محرك `llama.cpp`.
+2. **النماذج السحابية (Cloud)**: التبديل السلس بين أحدث النماذج العالمية المجانية والمدفوعة (**DeepSeek V3 & R1**, **Kimi**, **Groq/علّام 2**, **Claude 3.7**, **GPT-4o**).
+3. **أتمتة وإدارة GitHub**: فحص التعديلات اللحظية، مراجعة الأكواد بالذكاء الاصطناعي (`git diff`)، وتوليد رسائل Commit احترافية والرفع المباشر (`Auto Push`).
+4. **دعم العملات الرقمية والتبرعات**: شاشة مدمجة لاستقبال التبرعات عبر شبكات الكريبتو لدعم استمرار المشروع.
 
 ---
 
-## 🚀 التثبيت والتشغيل (Quick Start)
+## 🛠️ دليل التثبيت الشامل حسب نظام التشغيل (Installation Guide)
 
+اختر نظامك واتبع الخطوات البسيطة التالية:
+
+### 1. 📱 أندرويد (Android عبر Termux)
+افتح تطبيق **Termux** ونفّذ الأوامر التالية:
 ```bash
-# 1. استنساخ المستودع
-git clone https://github.com/YOUR_USERNAME/ai-dev-hub.git
+# تثبيت Git و Python
+pkg update && pkg install -y git python
+
+# استنساخ المستودع
+git clone https://github.com/Manara920/ai-dev-hub.git
 cd ai-dev-hub
 
-# 2. تثبيت الحزم المطلوبة
-pip install -r requirements.txt
-chmod +x ai_hub.py
+# التشغيل عبر سكربت التثبيت التلقائي
+bash install.sh
 
-# 3. التشغيل
+# لتشغيل البرنامج في أي وقت:
 ./ai_hub.py
 ```
 
 ---
 
+### 2. 🐧 لينكس (Linux - Ubuntu / Debian / Fedora / Arch)
+افتح الطرفية (Terminal) ونفّذ:
+```bash
+# استنساخ المستودع
+git clone https://github.com/Manara920/ai-dev-hub.git
+cd ai-dev-hub
+
+# تشغيل التثبيت التلقائي
+chmod +x install.sh
+./install.sh
+
+# لتشغيل البرنامج:
+./ai_hub.py
+```
+
+---
+
+### 3. 🪟 ويندوز (Windows)
+1. تأكد من تثبيت **Python** من الموقع الرسمي [python.org](https://www.python.org/downloads/) مع تفعيل خيار **"Add Python to PATH"**.
+2. افتح موجه الأوامر (**CMD**) أو **PowerShell** ونفّذ:
+```cmd
+git clone https://github.com/Manara920/ai-dev-hub.git
+cd ai-dev-hub
+
+install.bat
+```
+3. لتشغيل البرنامج في أي وقت:
+```cmd
+python ai_hub.py
+```
+
+---
+
+## 🔑 كيفية الحصول على المفاتيح السحابية (API Keys)
+
+- **OpenRouter (الخيار الشامل الموصى به)**: يمنحك وصولاً مجانياً لـ **DeepSeek V3 & R1** ونموذج **Kimi** عبر [openrouter.ai/keys](https://openrouter.ai/keys).
+- **Groq Cloud (فائق السرعة مجاناً)**: يدعم نموذج علّام العربي وسرعة تفوق 300 كلمة/ثانية عبر [console.groq.com/keys](https://console.groq.com/keys).
+- **DeepSeek Direct**: المنصة الرسمية عبر [platform.deepseek.com](https://platform.deepseek.com).
+- **Moonshot AI (Kimi)**: المنصة الرسمية عبر [platform.moonshot.cn](https://platform.moonshot.cn).
+
+> [!TIP]
+> يمكنك إدخال وتعديل أي مفتاح في أي وقت مباشرة من واجهة البرنامج بالضغط على زر **`[K]`**.
+
+---
+
 ## 🪙 دعم وتطوير المشروع (Donations & Support)
 
-إذا نال هذا المشروع استحسانك وأردت المساهمة في استمراريته وتطويره، يمكنك دعمه عبر المحافظ الرقمية التالية:
+إذا نال هذا المشروع استحسانك وأردت المساهمة في استمراريته وتطويره، يمكنك دعمه عبر المحافظ الرقمية المعتمدة لـ **المنارة كريبتو**:
 
 | العملة / الشبكة | نوع المحفظة | عنوان المحفظة (Address) |
 |---|---|---|
