@@ -38,20 +38,46 @@ else
     mkdir -p "$BIN_DIR"
 fi
 
-# 2. فحص دعم PEP 668 وتثبيت حزم بايثون
-echo "[*] جاري تثبيت حزم بايثون المطلوبة..."
-PIP_EXTRA_ARGS=""
-if python3 -m pip install --help 2>&1 | grep -q -- '--break-system-packages'; then
-    PIP_EXTRA_ARGS="--break-system-packages"
+# 2. تحديد وضع التثبيت (بيئة افتراضية معزولة أو في النظام العام)
+echo ""
+echo "----------------------------------------------------------"
+echo "❓ كيف تفضل تثبيت متطلبات بايثون؟"
+echo "  [1] إنشاء بيئة افتراضية معزولة (.venv) - [موصى به لحماية النظام]"
+echo "  [2] التثبيت المباشر في بيئة النظام / تيرمكس العامة"
+echo "----------------------------------------------------------"
+
+ENV_CHOICE="1"
+if [ -t 0 ]; then
+    read -r -p "اختر [1 أو 2] (الافتراضي 1): " USER_INPUT_CHOICE
+    if [ "$USER_INPUT_CHOICE" = "2" ]; then
+        ENV_CHOICE="2"
+    fi
 fi
 
-python3 -m pip install --upgrade pip $PIP_EXTRA_ARGS 2>/dev/null || true
-python3 -m pip install -r requirements.txt $PIP_EXTRA_ARGS
+if [ "$ENV_CHOICE" = "1" ]; then
+    echo "[*] تهيئة البيئة الافتراضية (.venv)..."
+    if [ ! -d ".venv" ]; then
+        python3 -m venv .venv
+    fi
+    source .venv/bin/activate
+    echo "[*] جاري تحديث pip وتثبيت المتطلبات داخل البيئة الافتراضية..."
+    pip install --upgrade pip 2>/dev/null || true
+    pip install -r requirements.txt
+    USE_VENV_MSG=1
+else
+    echo "[*] جاري تثبيت حزم بايثون مباشرة في بيئة النظام العامة..."
+    PIP_EXTRA_ARGS=""
+    if python3 -m pip install --help 2>&1 | grep -q -- '--break-system-packages'; then
+        PIP_EXTRA_ARGS="--break-system-packages"
+    fi
+    python3 -m pip install --upgrade pip $PIP_EXTRA_ARGS 2>/dev/null || true
+    python3 -m pip install -r requirements.txt $PIP_EXTRA_ARGS
+    USE_VENV_MSG=0
+fi
 
 # 3. إعداد الصلاحيات
 echo "[*] إعداد صلاحيات التشغيل..."
-chmod +x ai_hub.py
-chmod +x bin/groq
+chmod +x ai_hub.py bin/groq run.sh setup_venv.sh 2>/dev/null || true
 
 # 4. إعداد الرابط الرمزي (Symlink) لأداة groq
 if [ -n "$BIN_DIR" ] && [ -d "$BIN_DIR" ]; then
@@ -70,8 +96,16 @@ fi
 
 echo "=========================================================="
 echo " [✓] اكتمل التثبيت بنجاح!"
-echo " لتشغيل لوحة التحكم الرئيسية:"
-echo "   ./ai_hub.py   أو   python3 ai_hub.py"
+if [ "$USE_VENV_MSG" = "1" ]; then
+    echo " 💡 تم التثبيت داخل بيئة افتراضية معزولة (.venv)"
+    echo " لتشغيل البرنامج مباشرة (يقوم بتفعيل البيئة تلقائياً):"
+    echo "   ./run.sh"
+    echo " أو تفعيل البيئة يدوياً:"
+    echo "   source .venv/bin/activate && python3 ai_hub.py"
+else
+    echo " لتشغيل لوحة التحكم الرئيسية:"
+    echo "   ./ai_hub.py   أو   python3 ai_hub.py"
+fi
 echo " لتشغيل أداة الذكاء الاصطناعي المباشرة:"
 echo "   groq --help"
 echo "=========================================================="
