@@ -1,0 +1,454 @@
+#!/usr/bin/env python3
+"""
+==============================================================================
+ Groq Pro CLI - Advanced AI Terminal Assistant for Termux & Linux
+==============================================================================
+"""
+
+import sys
+import os
+import json
+import subprocess
+import argparse
+from pathlib import Path
+
+# --- Configuration & Storage ---
+CONFIG_DIR = Path.home() / ".config/groq"
+CONFIG_FILE = CONFIG_DIR / "config.json"
+HISTORY_DIR = CONFIG_DIR / "sessions"
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+
+# Find and load GROQ_API_KEY
+def get_api_key():
+    key = os.getenv("GROQ_API_KEY")
+    if key:
+        return key
+    
+    # Try .env locations
+    candidates = [
+        CONFIG_DIR / ".env",
+        Path.home() / ".gemini/antigravity-cli/scratch/groq_project/.env",
+        Path.home() / ".env"
+    ]
+    for c in candidates:
+        if c.exists():
+            with open(c, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "GROQ_API_KEY" in line and "=" in line:
+                        _, val = line.split("=", 1)
+                        return val.strip().strip('"').strip("'")
+    return None
+
+API_KEY = get_api_key()
+if not API_KEY:
+    sys.stderr.write("[-] Error: GROQ_API_KEY is not set.\n")
+    sys.stderr.write("    Set it via: export GROQ_API_KEY=\"your_key\"\n")
+    sys.stderr.write(f"    Or place it in: {CONFIG_DIR}/.env\n")
+    sys.exit(1)
+
+try:
+    from groq import Groq
+except ImportError:
+    sys.stderr.write("[-] Error: 'groq' package not found. Run: pip install groq\n")
+    sys.exit(1)
+
+# Import Rich for terminal beauty
+try:
+    from rich.console import Console
+    from rich.markdown import Markdown
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.syntax import Syntax
+    from rich.text import Text
+    USE_RICH = True
+    console = Console()
+except ImportError:
+    USE_RICH = False
+    console = None
+
+client = Groq(api_key=API_KEY)
+
+# --- Default Models ---
+MODELS = {
+    "1": ("allam-2-7b", "علّام 2 - فائق السرعة ومتخصص في اللغة العربية"),
+    "2": ("openai/gpt-oss-120b", "GPT-OSS 120B - أداء تفكير وبرمجة متقدم ومعقد"),
+    "3": ("qwen/qwen3.8-27b", "Qwen 3.8 27B - متوازن وقوي في الأكواد واللغات"),
+    "4": ("openai/gpt-oss-20b", "GPT-OSS 20B - سريع وخفيف للأوامر اليومية"),
+}
+
+DEFAULT_MODEL = "allam-2-7b"
+
+# Load saved user config
+def load_config():
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"default_model": DEFAULT_MODEL, "system_persona": "developer"}
+
+def save_config(cfg):
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+USER_CONFIG = load_config()
+
+# --- Personas ---
+PERSONAS = {
+    "developer": (
+        "أنت مساعد برمجي خبير ومحترف في لينكس وTermux والبرمجة. "
+        "قدم أكواداً نظيفة ومباشرة وموثقة، واشرح الخطوات بإيجاز ودقة."
+    ),
+    "arabic": (
+        "أنت مساعد ذكي باللغة العربية الفصحى السليمة، تقدم إجابات واضحة ودقيقة."
+    ),
+    "concise": (
+        "You are an ultra-concise technical assistant. Give direct answers, minimal pleasantries, and exact code."
+    )
+}
+
+def clean_text(text: str) -> str:
+    """Sanitize surrogate characters and broken UTF-8 encoding from input/output."""
+    if not isinstance(text, str):
+        return text
+    # Remove surrogate pairs that cause utf-8 encoding errors
+    return text.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+
+def clean_messages(messages):
+    """Sanitize all message contents before sending to Groq API."""
+    cleaned = []
+    for m in messages:
+        c = m.get("content", "")
+        if isinstance(c, str):
+            c = clean_text(c)
+        cleaned.append({"role": m["role"], "content": c})
+    return cleaned
+
+def print_styled(content, is_markdown=True):
+    if USE_RICH and console:
+        if is_markdown:
+            console.print(Markdown(clean_text(content)))
+        else:
+            console.print(clean_text(content))
+    else:
+        print(clean_text(content))
+
+def copy_to_clipboard(text: str):
+    # Try Termux clipboard API first
+    try:
+        proc = subprocess.Popen(["termux-clipboard-set"], stdin=subprocess.PIPE)
+        proc.communicate(input=text.encode("utf-8"))
+        if proc.returncode == 0:
+            return True
+    except FileNotFoundError:
+        pass
+
+    # Try xclip or wl-copy
+    for cmd in ["xclip -selection clipboard", "wl-copy"]:
+        try:
+            proc = subprocess.Popen(cmd.split(), stdin=subprocess.PIPE)
+            proc.communicate(input=text.encode("utf-8"))
+            if proc.returncode == 0:
+                return True
+        except FileNotFoundError:
+            continue
+    return False
+
+# --- Interactive Chat Session ---
+def start_interactive_session(model: str = None, persona: str = "developer"):
+    active_model = model or USER_CONFIG.get("default_model", DEFAULT_MODEL)
+    system_prompt = PERSONAS.get(persona, PERSONAS["developer"])
+
+    if USE_RICH:
+        banner = Table(show_header=False, box=None, padding=(0, 1))
+        banner.add_row("[bold cyan]⚡ Groq Pro CLI[/bold cyan] - مساعد الطرفية الذكي")
+        banner.add_row(f"[green]• النموذج النشط:[/green] [yellow]{active_model}[/yellow]")
+        banner.add_row("[dim]• اكتب [bold]/help[/bold] للأوامر، أو [bold]/exit[/bold] للخروج[/dim]")
+        console.print(Panel(banner, border_style="cyan"))
+    else:
+        print("=" * 55)
+        print("  ⚡ Groq Pro CLI - مساعد الطرفية الذكي")
+        print(f"  • النموذج: {active_model}")
+        print("  • اكتب /help للمساعدة أو /exit للخروج")
+        print("=" * 55)
+
+    history = [{"role": "system", "content": system_prompt}]
+    last_response = ""
+
+    while True:
+        try:
+            if USE_RICH:
+                user_input = console.input("\n[bold green]أنت ❯[/bold green] ").strip()
+            else:
+                user_input = input("\nأنت ❯ ").strip()
+
+            if not user_input:
+                continue
+
+            # --- Handle Slash Commands ---
+            if user_input.startswith("/"):
+                cmd_parts = user_input.split(maxsplit=1)
+                cmd = cmd_parts[0].lower()
+                arg = cmd_parts[1].strip() if len(cmd_parts) > 1 else ""
+
+                if cmd in ["/exit", "/quit", "/q"]:
+                    print_styled("[yellow]مع السلامة![/yellow]" if USE_RICH else "مع السلامة!")
+                    break
+
+                elif cmd == "/help":
+                    help_text = """
+### 🛠️ أوامر المساعد التفاعلي:
+- `/help` : عرض هذه المساعدة
+- `/models` : عرض قائمة النماذج وتغيير النموذج النشط
+- `/model <اسم_النموذج>` : التبديل لنموذج محدد فوراً
+- `/file <مسار_الملف>` : قراءة ملف محلي وتضمينه لتحليله
+- `/save <مسار>` : حفظ آخر رد أو كود في ملف
+- `/copy` : نسخ آخر رد إلى الحافظة (Clipboard)
+- `/clear` : مسح سياق الجلسة والبدء من جديد
+- `/exit` : إغلاق الجلسة
+"""
+                    print_styled(help_text)
+                    continue
+
+                elif cmd in ["/models", "/model"]:
+                    if not arg:
+                        if USE_RICH:
+                            table = Table(title="النماذج المتاحة", border_style="blue")
+                            table.add_column("الرقم", justify="center", style="cyan")
+                            table.add_column("الاسم التقني", style="green")
+                            table.add_column("الوصف", style="white")
+                            for k, (m_id, desc) in MODELS.items():
+                                marker = " [bold green](نشط)[/bold green]" if m_id == active_model else ""
+                                table.add_row(k, f"{m_id}{marker}", desc)
+                            console.print(table)
+                            num = console.input("[yellow]اختر رقم النموذج [1-4] أو اضغط Enter للإلغاء:[/yellow] ").strip()
+                        else:
+                            print("\nالنماذج المتاحة:")
+                            for k, (m_id, desc) in MODELS.items():
+                                marker = " (نشط)" if m_id == active_model else ""
+                                print(f"[{k}] {m_id}{marker} - {desc}")
+                            num = input("اختر رقم النموذج [1-4]: ").strip()
+
+                        if num in MODELS:
+                            active_model = MODELS[num][0]
+                            USER_CONFIG["default_model"] = active_model
+                            save_config(USER_CONFIG)
+                            print_styled(f"[green]✓ تم التبديل إلى النموذج:[/green] [bold]{active_model}[/bold]" if USE_RICH else f"✓ تم التبديل إلى: {active_model}")
+                    else:
+                        active_model = arg
+                        USER_CONFIG["default_model"] = active_model
+                        save_config(USER_CONFIG)
+                        print_styled(f"[green]✓ تم التبديل إلى النموذج:[/green] [bold]{active_model}[/bold]" if USE_RICH else f"✓ تم التبديل إلى: {active_model}")
+                    continue
+
+                elif cmd == "/file":
+                    if not arg:
+                        print_styled("[red]يرجى تحديد مسار الملف: /file path/to/file[/red]" if USE_RICH else "حدد مسار الملف: /file <path>")
+                        continue
+                    file_path = Path(arg).expanduser().resolve()
+                    if not file_path.exists():
+                        print_styled(f"[red]الملف غير موجود: {file_path}[/red]" if USE_RICH else f"الملف غير موجود: {file_path}")
+                        continue
+                    try:
+                        content = file_path.read_text(encoding="utf-8", errors="replace")
+                        attach_prompt = f"إليك محتوى الملف `{file_path.name}`:\n```\n{content}\n```\nيرجى مراجعته وتأكيد استلامه."
+                        history.append({"role": "user", "content": attach_prompt})
+                        print_styled(f"[green]✓ تم تضمين الملف {file_path.name} ({len(content.splitlines())} سطر)[/green]" if USE_RICH else f"✓ تم تضمين الملف {file_path.name}")
+                        # Get acknowledgment
+                        resp = client.chat.completions.create(model=active_model, messages=history)
+                        ack = resp.choices[0].message.content or "تم استلام الملف."
+                        history.append({"role": "assistant", "content": ack})
+                        print_styled(f"\n[cyan]Groq ❯[/cyan] {ack}" if USE_RICH else f"\nGroq ❯ {ack}")
+                    except Exception as e:
+                        print_styled(f"[red]خطأ أثناء قراءة الملف: {e}[/red]" if USE_RICH else f"خطأ: {e}")
+                    continue
+
+                elif cmd == "/save":
+                    if not last_response:
+                        print_styled("[yellow]لا يوجد رد بعد لحفظه.[/yellow]" if USE_RICH else "لا يوجد رد لحفظه.")
+                        continue
+                    save_path = arg or "groq_output.txt"
+                    target = Path(save_path).expanduser().resolve()
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    clean_res = last_response
+                    if clean_res.strip().startswith("```") and clean_res.strip().endswith("```"):
+                        lines = clean_res.strip().splitlines()
+                        if len(lines) >= 2:
+                            clean_res = "\n".join(lines[1:-1])
+                    target.write_text(clean_res, encoding="utf-8")
+                    print_styled(f"[green]✓ تم حفظ الرد في: {target}[/green]" if USE_RICH else f"✓ تم الحفظ في: {target}")
+                    continue
+
+                elif cmd == "/copy":
+                    if not last_response:
+                        print_styled("[yellow]لا يوجد رد لنسخه.[/yellow]" if USE_RICH else "لا يوجد رد.")
+                        continue
+                    if copy_to_clipboard(last_response):
+                        print_styled("[green]✓ تم نسخ الرد إلى الحافظة![/green]" if USE_RICH else "✓ تم النسخ.")
+                    else:
+                        print_styled("[red]تعذر النسخ. لتفعيل النسخ في Termux ثبت: pkg install termux-api[/red]" if USE_RICH else "تعذر النسخ.")
+                    continue
+
+                elif cmd == "/clear":
+                    history = [{"role": "system", "content": system_prompt}]
+                    last_response = ""
+                    print_styled("[green]✓ تم مسح سياق المحادثة والبدء من جديد.[/green]" if USE_RICH else "✓ تم مسح المحادثة.")
+                    continue
+
+                else:
+                    print_styled(f"[yellow]أمر غير معروف: {cmd}. اكتب /help لعرض الأوامر.[/yellow]" if USE_RICH else f"أمر غير معروف: {cmd}")
+                    continue
+
+            # --- Normal Query Flow ---
+            history.append({"role": "user", "content": clean_text(user_input)})
+
+            if USE_RICH:
+                console.print(f"\n[bold cyan]Groq ({active_model}) ❯[/bold cyan]")
+            else:
+                print(f"\nGroq ❯ ", end="", flush=True)
+
+            stream = client.chat.completions.create(
+                model=active_model,
+                messages=clean_messages(history),
+                stream=True
+            )
+
+            full_reply = ""
+            for chunk in stream:
+                token = chunk.choices[0].delta.content or ""
+                token_clean = clean_text(token)
+                sys.stdout.write(token_clean)
+                sys.stdout.flush()
+                full_reply += token_clean
+
+            print("\n")
+            last_response = full_reply
+            history.append({"role": "assistant", "content": full_reply})
+
+        except (KeyboardInterrupt, EOFError):
+            print("\nتم إنهاء الجلسة.")
+            break
+        except Exception as e:
+            print_styled(f"\n[red] خطأ أثناء الاتصال بـ Groq: {e}[/red]" if USE_RICH else f"\nخطأ: {e}")
+
+# --- One-Shot Execution Flow ---
+def execute_one_shot(prompt: str, model: str, output_file: str = None, file_input: str = None):
+    active_model = model or USER_CONFIG.get("default_model", DEFAULT_MODEL)
+    
+    extra_context = ""
+    if file_input:
+        fpath = Path(file_input).expanduser().resolve()
+        if fpath.exists():
+            fcontent = fpath.read_text(encoding="utf-8", errors="replace")
+            extra_context = f"\n\n--- محتوى الملف `{fpath.name}` ---\n{fcontent}\n--- نهاية الملف ---\n"
+        else:
+            sys.stderr.write(f"[-] Warning: File not found: {file_input}\n")
+
+    full_prompt = f"{prompt}{extra_context}" if prompt else extra_context.strip()
+
+    try:
+        if output_file:
+            if USE_RICH:
+                console.print(f"[dim]⚡ يتم الاستعلام من Groq ([bold]{active_model}[/bold])...[/dim]")
+            else:
+                print(f"[*] يتم الاستعلام من Groq ({active_model})...")
+
+            resp = client.chat.completions.create(
+                model=active_model,
+                messages=clean_messages([
+                    {"role": "system", "content": PERSONAS["developer"]},
+                    {"role": "user", "content": full_prompt}
+                ])
+            )
+            content = resp.choices[0].message.content or ""
+            
+            clean_content = clean_text(content)
+            if clean_content.strip().startswith("```") and clean_content.strip().endswith("```"):
+                lines = clean_content.strip().splitlines()
+                if len(lines) >= 2:
+                    clean_content = "\n".join(lines[1:-1])
+
+            out_path = Path(output_file).expanduser().resolve()
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(clean_content, encoding="utf-8")
+            
+            lines_cnt = len(clean_content.splitlines())
+            if USE_RICH:
+                console.print(f"[bold green]✓ تم حفظ النتيجة بنجاح في:[/bold green] [cyan]{out_path}[/cyan] ({lines_cnt} سطر)")
+            else:
+                print(f"[✓] تم حفظ النتيجة في: {out_path} ({lines_cnt} سطر)")
+        else:
+            stream = client.chat.completions.create(
+                model=active_model,
+                messages=clean_messages([
+                    {"role": "system", "content": PERSONAS["developer"]},
+                    {"role": "user", "content": full_prompt}
+                ]),
+                stream=True
+            )
+            for chunk in stream:
+                text = chunk.choices[0].delta.content or ""
+                sys.stdout.write(clean_text(text))
+                sys.stdout.flush()
+            print()
+
+    except Exception as e:
+        sys.stderr.write(f"[-] Error: {e}\n")
+        sys.exit(1)
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="⚡ Groq Pro CLI - المساعد الذكي المباشر للطرفية",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument("query", nargs="*", help="النص أو السؤال المباشر (اتركه فارغاً لبدء شات تفاعلي)")
+    parser.add_argument("-m", "--model", help="تحديد نموذج الذكاء الاصطناعي (allam-2-7b, openai/gpt-oss-120b, ...)")
+    parser.add_argument("-f", "--file", help="تضمين ملف لتحليله أو مراجعته")
+    parser.add_argument("-o", "--output", help="حفظ الكود أو النتيجة في ملف مباشرة")
+    parser.add_argument("-l", "--list-models", action="store_true", help="عرض جميع النماذج المتوفرة في حسابك")
+    parser.add_argument("-v", "--version", action="version", version="Groq Pro CLI 2.0 (Termux Edition)")
+
+    args = parser.parse_args()
+
+    if args.list_models:
+        try:
+            models_data = client.models.list()
+            if USE_RICH:
+                tbl = Table(title="نماذج Groq المتاحة في حسابك", border_style="cyan")
+                tbl.add_column("معرف النموذج (ID)", style="green")
+                tbl.add_column("المالك (Owner)", style="yellow")
+                for m in models_data.data:
+                    tbl.add_row(m.id, getattr(m, 'owned_by', 'Unknown'))
+                console.print(tbl)
+            else:
+                for m in models_data.data:
+                    print(f"- {m.id} ({m.owned_by})")
+        except Exception as e:
+            sys.stderr.write(f"[-] Error: {e}\n")
+        return
+
+    # Check stdin (pipes)
+    stdin_content = ""
+    if not sys.stdin.isatty():
+        stdin_content = sys.stdin.read().strip()
+
+    prompt = " ".join(args.query).strip()
+    if stdin_content:
+        prompt = f"{prompt}\n\n{stdin_content}" if prompt else stdin_content
+
+    # If no prompt and no file, launch interactive chat
+    if not prompt and not args.file:
+        start_interactive_session(model=args.model)
+    else:
+        execute_one_shot(
+            prompt=prompt,
+            model=args.model,
+            output_file=args.output,
+            file_input=args.file
+        )
+
+if __name__ == "__main__":
+    main()
