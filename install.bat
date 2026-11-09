@@ -3,6 +3,8 @@ REM ============================================================================
 REM  Al-Manara AI Dev Hub Pro - Windows Auto Installer
 REM ==============================================================================
 
+cd /d "%~dp0"
+
 echo ==========================================================
 echo  🏮 Al-Manara AI Dev Hub Pro - Setup for Windows
 echo ==========================================================
@@ -19,7 +21,16 @@ if %errorlevel% neq 0 (
 
 echo [*] Upgrading pip and installing requirements...
 python -m pip install --upgrade pip
+if %errorlevel% neq 0 (
+    echo [-] Warning: Failed to upgrade pip. Continuing with installation...
+)
+
 python -m pip install -r requirements.txt
+if %errorlevel% neq 0 (
+    echo [-] Error: Failed to install Python dependencies from requirements.txt.
+    pause
+    exit /b %errorlevel%
+)
 
 REM Create .env from template if missing
 if not exist "config\.env" (
@@ -29,10 +40,26 @@ if not exist "config\.env" (
     )
 )
 
+REM Generate Windows command wrappers for groq CLI
+echo [*] Generating Windows command wrappers for groq...
+(
+echo @echo off
+echo python "%%~dp0bin\groq" %%*
+) > "%~dp0groq.cmd"
+
+(
+echo @echo off
+echo python "%%~dp0groq" %%*
+) > "%~dp0bin\groq.bat"
+
+echo [+] Created groq.cmd and bin\groq.bat
+
 echo.
 echo ==========================================================
 echo  [✓] Setup completed successfully!
 echo  To run the application anytime, type:
-echo  python ai_hub.py
+echo    python ai_hub.py
+echo  To run the Groq CLI directly:
+echo    groq --help
 echo ==========================================================
 pause

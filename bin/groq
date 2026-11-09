@@ -16,43 +16,66 @@ from pathlib import Path
 CONFIG_DIR = Path.home() / ".config/groq"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 HISTORY_DIR = CONFIG_DIR / "sessions"
-CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
 # Find and load GROQ_API_KEY
 def get_api_key():
     key = os.getenv("GROQ_API_KEY")
     if key:
         return key
-    
+
     # Try .env locations
+    repo_root = Path(__file__).resolve().parent.parent
     candidates = [
+        Path.cwd() / "config/.env",
+        Path.cwd() / ".env",
+        repo_root / "config/.env",
         CONFIG_DIR / ".env",
-        Path.home() / ".gemini/antigravity-cli/scratch/groq_project/.env",
+        Path.home() / ".config/groq/.env",
         Path.home() / ".env"
     ]
     for c in candidates:
-        if c.exists():
-            with open(c, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and "GROQ_API_KEY" in line and "=" in line:
-                        _, val = line.split("=", 1)
-                        return val.strip().strip('"').strip("'")
+        if c.exists() and c.is_file():
+            try:
+                with open(c, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "GROQ_API_KEY" in line and "=" in line:
+                            _, val = line.split("=", 1)
+                            val = val.strip().strip('"').strip("'")
+                            if val:
+                                return val
+            except Exception:
+                pass
     return None
 
-API_KEY = get_api_key()
-if not API_KEY:
-    sys.stderr.write("[-] Error: GROQ_API_KEY is not set.\n")
-    sys.stderr.write("    Set it via: export GROQ_API_KEY=\"your_key\"\n")
-    sys.stderr.write(f"    Or place it in: {CONFIG_DIR}/.env\n")
-    sys.exit(1)
+# Lazy client initialization
+_client = None
 
-try:
-    from groq import Groq
-except ImportError:
-    sys.stderr.write("[-] Error: 'groq' package not found. Run: pip install groq\n")
-    sys.exit(1)
+def get_client():
+    global _client
+    if _client is not None:
+        return _client
+
+    api_key = get_api_key()
+    if not api_key:
+        sys.stderr.write("[-] Error: GROQ_API_KEY is not set.\n")
+        sys.stderr.write("    Set it via: export GROQ_API_KEY=\"your_key\"\n")
+        sys.stderr.write(f"    Or place it in config/.env or {CONFIG_DIR}/.env\n")
+        sys.exit(1)
+
+    try:
+        from groq import Groq
+    except ImportError:
+        sys.stderr.write("[-] Error: 'groq' package not found. Run: pip install groq\n")
+        sys.exit(1)
+
+    _client = Groq(api_key=api_key)
+    return _client
 
 # Import Rich for terminal beauty
 try:
@@ -67,8 +90,6 @@ try:
 except ImportError:
     USE_RICH = False
     console = None
-
-client = Groq(api_key=API_KEY)
 
 # --- Default Models ---
 MODELS = {
@@ -91,8 +112,11 @@ def load_config():
     return {"default_model": DEFAULT_MODEL, "system_persona": "developer"}
 
 def save_config(cfg):
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2, ensure_ascii=False)
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
 
 USER_CONFIG = load_config()
 
@@ -137,28 +161,49 @@ def print_styled(content, is_markdown=True):
         print(clean_text(content))
 
 def copy_to_clipboard(text: str):
-    # Try Termux clipboard API first
+    # 1. Termux clipboard API
     try:
         proc = subprocess.Popen(["termux-clipboard-set"], stdin=subprocess.PIPE)
         proc.communicate(input=text.encode("utf-8"))
         if proc.returncode == 0:
             return True
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError):
         pass
 
-    # Try xclip or wl-copy
-    for cmd in ["xclip -selection clipboard", "wl-copy"]:
+    # 2. Linux X11 / Wayland clipboard tools
+    for cmd in ["xclip -selection clipboard", "xsel --clipboard --input", "wl-copy"]:
         try:
             proc = subprocess.Popen(cmd.split(), stdin=subprocess.PIPE)
             proc.communicate(input=text.encode("utf-8"))
             if proc.returncode == 0:
                 return True
-        except FileNotFoundError:
+        except (FileNotFoundError, PermissionError):
             continue
+
+    # 3. macOS pbcopy
+    try:
+        proc = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
+        proc.communicate(input=text.encode("utf-8"))
+        if proc.returncode == 0:
+            return True
+    except (FileNotFoundError, PermissionError):
+        pass
+
+    # 4. Windows clip / clip.exe
+    for clip_cmd in ["clip", "clip.exe"]:
+        try:
+            proc = subprocess.Popen([clip_cmd], stdin=subprocess.PIPE)
+            proc.communicate(input=text.encode("utf-16le" if os.name == "nt" else "utf-8"))
+            if proc.returncode == 0:
+                return True
+        except (FileNotFoundError, PermissionError):
+            continue
+
     return False
 
 # --- Interactive Chat Session ---
 def start_interactive_session(model: str = None, persona: str = "developer"):
+    client = get_client()
     active_model = model or USER_CONFIG.get("default_model", DEFAULT_MODEL)
     system_prompt = PERSONAS.get(persona, PERSONAS["developer"])
 
@@ -257,9 +302,11 @@ def start_interactive_session(model: str = None, persona: str = "developer"):
                         attach_prompt = f"إليك محتوى الملف `{file_path.name}`:\n```\n{content}\n```\nيرجى مراجعته وتأكيد استلامه."
                         history.append({"role": "user", "content": attach_prompt})
                         print_styled(f"[green]✓ تم تضمين الملف {file_path.name} ({len(content.splitlines())} سطر)[/green]" if USE_RICH else f"✓ تم تضمين الملف {file_path.name}")
-                        # Get acknowledgment
-                        resp = client.chat.completions.create(model=active_model, messages=history)
-                        ack = resp.choices[0].message.content or "تم استلام الملف."
+                        # Get acknowledgment with clean_messages
+                        resp = client.chat.completions.create(model=active_model, messages=clean_messages(history))
+                        ack = "تم استلام الملف."
+                        if getattr(resp, "choices", None) and len(resp.choices) > 0 and resp.choices[0].message:
+                            ack = resp.choices[0].message.content or "تم استلام الملف."
                         history.append({"role": "assistant", "content": ack})
                         print_styled(f"\n[cyan]Groq ❯[/cyan] {ack}" if USE_RICH else f"\nGroq ❯ {ack}")
                     except Exception as e:
@@ -318,7 +365,12 @@ def start_interactive_session(model: str = None, persona: str = "developer"):
 
             full_reply = ""
             for chunk in stream:
-                token = chunk.choices[0].delta.content or ""
+                if not getattr(chunk, "choices", None) or len(chunk.choices) == 0:
+                    continue
+                delta = chunk.choices[0].delta
+                if not delta:
+                    continue
+                token = delta.content or ""
                 token_clean = clean_text(token)
                 sys.stdout.write(token_clean)
                 sys.stdout.flush()
@@ -336,6 +388,7 @@ def start_interactive_session(model: str = None, persona: str = "developer"):
 
 # --- One-Shot Execution Flow ---
 def execute_one_shot(prompt: str, model: str, output_file: str = None, file_input: str = None):
+    client = get_client()
     active_model = model or USER_CONFIG.get("default_model", DEFAULT_MODEL)
     
     extra_context = ""
@@ -363,7 +416,9 @@ def execute_one_shot(prompt: str, model: str, output_file: str = None, file_inpu
                     {"role": "user", "content": full_prompt}
                 ])
             )
-            content = resp.choices[0].message.content or ""
+            content = ""
+            if getattr(resp, "choices", None) and len(resp.choices) > 0 and resp.choices[0].message:
+                content = resp.choices[0].message.content or ""
             
             clean_content = clean_text(content)
             if clean_content.strip().startswith("```") and clean_content.strip().endswith("```"):
@@ -390,7 +445,12 @@ def execute_one_shot(prompt: str, model: str, output_file: str = None, file_inpu
                 stream=True
             )
             for chunk in stream:
-                text = chunk.choices[0].delta.content or ""
+                if not getattr(chunk, "choices", None) or len(chunk.choices) == 0:
+                    continue
+                delta = chunk.choices[0].delta
+                if not delta:
+                    continue
+                text = delta.content or ""
                 sys.stdout.write(clean_text(text))
                 sys.stdout.flush()
             print()
@@ -409,11 +469,12 @@ def main():
     parser.add_argument("-f", "--file", help="تضمين ملف لتحليله أو مراجعته")
     parser.add_argument("-o", "--output", help="حفظ الكود أو النتيجة في ملف مباشرة")
     parser.add_argument("-l", "--list-models", action="store_true", help="عرض جميع النماذج المتوفرة في حسابك")
-    parser.add_argument("-v", "--version", action="version", version="Groq Pro CLI 2.0 (Termux Edition)")
+    parser.add_argument("-v", "--version", action="version", version="Groq Pro CLI 2.1 (Universal Edition)")
 
     args = parser.parse_args()
 
     if args.list_models:
+        client = get_client()
         try:
             models_data = client.models.list()
             if USE_RICH:
@@ -425,7 +486,7 @@ def main():
                 console.print(tbl)
             else:
                 for m in models_data.data:
-                    print(f"- {m.id} ({m.owned_by})")
+                    print(f"- {m.id} ({getattr(m, 'owned_by', 'Unknown')})")
         except Exception as e:
             sys.stderr.write(f"[-] Error: {e}\n")
         return
