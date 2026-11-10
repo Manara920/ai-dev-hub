@@ -117,7 +117,8 @@ bash setup_venv.sh
 ```
 - **للدخول إلى البيئة لاحقاً في أي جلسة جديدة:**
   ```bash
-  source ~/ai-dev-hub/.venv/bin/activate
+  source .venv/bin/activate
+  # أو: source ~/ai-dev-hub/.venv/bin/activate (بحسب مسار التثبيت)
   ```
 - **أو استخدم المشغل التلقائي مباشرة:**
   ```bash

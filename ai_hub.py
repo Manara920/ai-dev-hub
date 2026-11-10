@@ -104,7 +104,14 @@ def get_local_models_dir():
         p = Path(custom_path).expanduser()
         p.mkdir(parents=True, exist_ok=True)
         return p
-    for fallback in [Path("/storage/emulated/0/LLM's"), Path.home() / "models", Path.home() / "LLMs"]:
+    # التحقق من المسار المحدد أو المسارات الافتراضية العامة
+    default_candidates = [
+        Path.home() / "models",
+        Path.home() / "LLMs",
+        ROOT_DIR / "models",
+        Path("/storage/emulated/0/LLM's") # مسار أندرويد اختياري في حال وجوده
+    ]
+    for fallback in default_candidates:
         if fallback.exists() and fallback.is_dir():
             return fallback
     default_dir = Path.home() / "models"
