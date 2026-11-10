@@ -255,7 +255,51 @@ def get_recommended_models():
 # 📥 وحدة التنزيل من Hugging Face (Direct Resumable Downloader)
 # ==============================================================================
 
-def download_file_with_progress(url, dest_path):
+def download_hf_folder(repo_id, dest_dir, hf_token=None):
+    """تنزيل مجلد نموذج كامل (Safetensors / Configs) عبر Hugging Face API."""
+    dest = Path(dest_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+    
+    api_url = f"https://huggingface.co/api/models/{repo_id}"
+    req_headers = {"User-Agent": "AlManara-AIDevHub/2.4.0"}
+    if hf_token:
+        req_headers["Authorization"] = f"Bearer {hf_token}"
+    
+    try:
+        req = urllib.request.Request(api_url, headers=req_headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.load(resp)
+            siblings = data.get("siblings", [])
+            if not siblings:
+                return False, "لم يتم العثور على أي ملفات في المستودع"
+            
+            target_files = [
+                s["rfilename"] for s in siblings
+                if s["rfilename"].endswith((".safetensors", ".json", ".txt", ".model", ".tiktoken"))
+                and not s["rfilename"].startswith(".")
+            ]
+            
+            if not target_files:
+                return False, "لم يتم العثور على ملفات safetensors أو ملفات تهيئة صالحة"
+            
+            print(f"\n[*] تم العثور على {len(target_files)} ملف في المستودع. بدء التنزيل المباشر:")
+            for idx, rfile in enumerate(target_files, 1):
+                file_dest = dest / rfile
+                file_dest.parent.mkdir(parents=True, exist_ok=True)
+                file_url = f"https://huggingface.co/{repo_id}/resolve/main/{rfile}"
+                print(f"\n({idx}/{len(target_files)}) جاري تنزيل {rfile}:")
+                ok, err = download_file_with_progress(file_url, file_dest, hf_token=hf_token)
+                if not ok and not file_dest.exists():
+                    return False, f"فشل تنزيل {rfile}: {err}"
+            return True, "تم تحميل كامل ملفات النموذج بنجاح"
+    except urllib.error.HTTPError as e:
+        if e.code in [401, 403]:
+            return False, "المستودع مغلق ويتطلب تصريحاً أو HF_TOKEN (رمز وصول من Hugging Face)"
+        return False, f"خطأ HTTP {e.code}: {e.reason}"
+    except Exception as e:
+        return False, str(e)
+
+def download_file_with_progress(url, dest_path, hf_token=None):
     """تنزيل ملف مع شريط تقدم ودعم استئناف التحميل تلقائياً."""
     dest = Path(dest_path)
     part_path = dest.with_name(dest.name + ".part")
@@ -264,11 +308,15 @@ def download_file_with_progress(url, dest_path):
     if part_path.exists():
         existing_bytes = part_path.stat().st_size
 
-    req = urllib.request.Request(url, headers={
+    headers = {
         "User-Agent": "Mozilla/5.0 (Al-Manara AI Dev Hub Pro)",
-    })
+    }
+    if hf_token:
+        headers["Authorization"] = f"Bearer {hf_token}"
     if existing_bytes > 0:
-        req.add_header("Range", f"bytes={existing_bytes}-")
+        headers["Range"] = f"bytes={existing_bytes}-"
+    
+    req = urllib.request.Request(url, headers=headers)
 
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -385,23 +433,31 @@ def download_manager_menu():
             repo_id = chosen["repo"]
             filename = chosen["preferred_file"]
             models_dir = get_local_models_dir()
-            dest_file = models_dir / filename
+            hf_token = os.getenv("HF_TOKEN") or ENV_VARS.get("HF_TOKEN")
+            is_folder_engine = (chosen.get("engine") == "airllm" or filename == "safetensors")
             
-            if dest_file.exists():
-                print(f"\n[✓] النموذج موجود بالفعل في: {dest_file}")
-                safe_input("\nاضغط Enter للمتابعة...")
-                continue
+            if is_folder_engine:
+                dest_path = models_dir / (chosen.get("id") or "airllm-model")
+                if dest_path.exists() and any(dest_path.glob("*.safetensors")):
+                    print(f"\n[✓] النموذج موجود بالفعل في المجلد: {dest_path}")
+                    safe_input("\nاضغط Enter للمتابعة...")
+                    continue
+            else:
+                dest_path = models_dir / filename
+                if dest_path.exists():
+                    print(f"\n[✓] النموذج موجود بالفعل في: {dest_path}")
+                    safe_input("\nاضغط Enter للمتابعة...")
+                    continue
 
-            dl_url = f"https://huggingface.co/{repo_id}/resolve/main/{filename}"
             print(f"\n[*] جاري بدء تنزيل: {chosen['name']}")
             print(f"[*] المستودع: https://huggingface.co/{repo_id}")
-            print(f"[*] مسار الحفظ: {dest_file}")
+            print(f"[*] مسار الحفظ: {dest_path}")
             if chosen.get("engine") == "airllm":
                 if USE_RICH:
                     console.print(Panel(
                         "[bold yellow]⚠️ ملاحظة هامة حول نموذج AirLLM:[/bold yellow]\n"
                         "هذا النموذج يعمل بمحرك [bold magenta]AirLLM[/bold magenta] الذي يتطلب بيئة [bold cyan]Linux (proot-distro / Ubuntu)[/bold cyan].\n"
-                        "لا يمكن تشغيل AirLLM مباشرة في تيرمكس الخام، بل يتم الدخول للبيئة أولاً لتشغيله.",
+                        "يقوم المحمل بتنزيل كامل شظايا Safetensors وملفات التوكن بشكل متكامل ومنظم داخل مجلد النموذج.",
                         border_style="yellow", title="تنبيه المحرك"
                     ))
                 else:
@@ -409,7 +465,12 @@ def download_manager_menu():
             
             confirm = safe_input("تأكيد بدء التحميل؟ [Y/n]: ").strip().lower()
             if confirm in ["", "y", "yes"]:
-                ok, msg = download_file_with_progress(dl_url, dest_file)
+                if is_folder_engine:
+                    ok, msg = download_hf_folder(repo_id, dest_path, hf_token=hf_token)
+                else:
+                    dl_url = f"https://huggingface.co/{repo_id}/resolve/main/{filename}"
+                    ok, msg = download_file_with_progress(dl_url, dest_path, hf_token=hf_token)
+                
                 if ok:
                     print(f"\n[✓] تم تحميل النموذج بنجاح وهو الآن متاح فوراً في قائمة النماذج المحلية!")
                 else:

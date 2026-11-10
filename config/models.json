@@ -1,0 +1,124 @@
+{
+  "providers": {
+    "groq": {
+      "name": "Groq Cloud (LPU)",
+      "site_url": "https://console.groq.com/keys",
+      "guide": "سجل مجاناً ثم اذهب إلى API Keys وأنشئ مفتاحاً يبدأ بـ gsk_.",
+      "env_key": "GROQ_API_KEY",
+      "base_url": "https://api.groq.com/openai/v1",
+      "models": [
+        {
+          "id": "groq-allam",
+          "model_name": "allam-2-7b",
+          "label": "علّام 2 (سحابي - عربي فائق السرعة 🇸🇦)",
+          "tier": "🟢 مجاني (Free)"
+        },
+        {
+          "id": "groq-gpt120",
+          "model_name": "openai/gpt-oss-120b",
+          "label": "GPT-OSS 120B (تفكير واستدلال عميق 🧠)",
+          "tier": "🟢 مجاني (Free)"
+        },
+        {
+          "id": "groq-qwen",
+          "model_name": "qwen/qwen3.8-27b",
+          "label": "Qwen 3.8 27B (متوازن وشامل ⚡)",
+          "tier": "🟢 مجاني (Free)"
+        },
+        {
+          "id": "groq-llama3-8b",
+          "model_name": "llama-3.1-8b-instant",
+          "label": "Llama 3.1 8B Instant (فائق السرعة وخفيف ⚡)",
+          "tier": "🟢 مجاني (Free)"
+        },
+        {
+          "id": "groq-llama3-70b",
+          "model_name": "llama-3.3-70b-versatile",
+          "label": "Llama 3.3 70B Versatile (عملاق الذكاء والاستدلال 🧠)",
+          "tier": "🟢 مجاني (Free)"
+        }
+      ]
+    },
+    "openrouter": {
+      "name": "OpenRouter (البوابة الموحدة العالمية)",
+      "site_url": "https://openrouter.ai/keys",
+      "guide": "افضل موقع يجمع DeepSeek و Kimi ومئات النماذج بمفتاح واحد فقط (يبدأ بـ sk-or-).",
+      "env_key": "OPENROUTER_API_KEY",
+      "base_url": "https://openrouter.ai/api/v1",
+      "models": [
+        {
+          "id": "or-deepseek-v3-free",
+          "model_name": "deepseek/deepseek-chat:free",
+          "label": "DeepSeek V3 (النسخة المجانية الرسمية 🇨🇳)",
+          "tier": "🟢 مجاني (Free)"
+        },
+        {
+          "id": "or-deepseek-r1-free",
+          "model_name": "deepseek/deepseek-r1:free",
+          "label": "DeepSeek R1 (تفكير واستدلال متفوق - مجاني 🧠)",
+          "tier": "🟢 مجاني (Free)"
+        },
+        {
+          "id": "or-kimi-free",
+          "model_name": "moonshotai/moonshot-v1-8k",
+          "label": "Kimi (Moonshot AI - متخصص السياق الطويل 🌙)",
+          "tier": "🟢 متاح تجريبي (Free/Tier)"
+        },
+        {
+          "id": "or-claude-sonnet",
+          "model_name": "anthropic/claude-3.7-sonnet",
+          "label": "Claude 3.7 Sonnet (ملك البرمجة بلا منازع 👑)",
+          "tier": "💎 مدفوع (Paid)"
+        },
+        {
+          "id": "or-gpt4o",
+          "model_name": "openai/gpt-4o",
+          "label": "OpenAI GPT-4o (النموذج الشامل 🤖)",
+          "tier": "💎 مدفوع (Paid)"
+        }
+      ]
+    },
+    "deepseek_direct": {
+      "name": "DeepSeek Direct API",
+      "site_url": "https://platform.deepseek.com/api_keys",
+      "guide": "الموقع الرسمي لـ DeepSeek. يمنحك رصيداً مجانياً عند التسجيل الجديد.",
+      "env_key": "DEEPSEEK_API_KEY",
+      "base_url": "https://api.deepseek.com/v1",
+      "models": [
+        {
+          "id": "ds-v3",
+          "model_name": "deepseek-chat",
+          "label": "DeepSeek V3 الرسمي (سريع وقوي جداً)",
+          "tier": "🟢 رصيد مجاني/رخيص"
+        },
+        {
+          "id": "ds-r1",
+          "model_name": "deepseek-reasoner",
+          "label": "DeepSeek R1 الرسمي (تفكير منطقي عميق)",
+          "tier": "🟢 رصيد مجاني/رخيص"
+        }
+      ]
+    },
+    "moonshot_kimi": {
+      "name": "Moonshot AI (Kimi Direct)",
+      "site_url": "https://platform.moonshot.cn/console/api-keys",
+      "guide": "المنصة الرسمية لنموذج Kimi (Moonshot AI). رائد معالجة المستندات الضخمة.",
+      "env_key": "MOONSHOT_API_KEY",
+      "base_url": "https://api.moonshot.cn/v1",
+      "models": [
+        {
+          "id": "kimi-8k",
+          "model_name": "moonshot-v1-8k",
+          "label": "Kimi Moonshot 8K (ردود مباشرة ودقيقة)",
+          "tier": "🟢 رصيد مجاني"
+        },
+        {
+          "id": "kimi-32k",
+          "model_name": "moonshot-v1-32k",
+          "label": "Kimi Moonshot 32K (مستندات وأكواد طويلة)",
+          "tier": "🟢 رصيد مجاني"
+        }
+      ]
+    }
+  }
+}
